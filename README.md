@@ -47,7 +47,8 @@ Minits/
   Minutes/MinutesWriter.swift  Apple Intelligence draft, or outline fallback
   UI/                       Screens (roll call, recording, review, transcript, minutes)
   Eval/                     Speaker-attribution scoring (not part of the app; used by tests and the eval tool)
-Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed)
+Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
+Tests/MinitsTests/          Tests for Voice/ (VoiceTuning, a VoiceEngine snapshot test; needs FluidAudio + a Mac)
 docs/specs/                 Feature specs
 ```
 
@@ -56,11 +57,14 @@ docs/specs/                 Feature specs
 ```bash
 xcodegen
 xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'
+xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
 ```
+
+`MinitsTests` downloads FluidAudio's models on first run and needs a Mac with a Neural Engine (Apple Silicon) — the ASR model crashes on Intel Macs.
 
 ## Tuning
 
-Voice-matching thresholds are at the top of `VoiceEngine.swift`. Raise `sureSimilarity` to flag more lines for review; lower it to flag fewer.
+Voice-matching thresholds live in `VoiceTuning` at the top of `VoiceEngine.swift` and default to today's hand-picked values (`VoiceEngine.shared` always uses the defaults). Raise `sureSimilarity` to flag more lines for review; lower it to flag fewer. The eval harness (`docs/specs/speaker-eval-harness/`) overrides these per run instead of editing code.
 
 ## Tips for good results
 

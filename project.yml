@@ -67,3 +67,20 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.evaltests
+
+  # Tests for Minits/Voice (VoiceEngine, VoiceTuning). Compiles against FluidAudio, so these are
+  # slower than MinitsEvalTests and the snapshot test needs FluidAudio's models downloaded once:
+  # xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
+  MinitsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/MinitsTests
+      - Minits/Voice
+    dependencies:
+      - package: FluidAudio
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.tests
