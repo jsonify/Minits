@@ -46,6 +46,16 @@ Minits/
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Apple Intelligence draft, or outline fallback
   UI/                       Screens (roll call, recording, review, transcript, minutes)
+  Eval/                     Speaker-attribution scoring (not part of the app; used by tests and the eval tool)
+Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed)
+docs/specs/                 Feature specs
+```
+
+## Tests
+
+```bash
+xcodegen
+xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'
 ```
 
 ## Tuning

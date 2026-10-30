@@ -24,6 +24,7 @@ targets:
       - path: Minits
         excludes:
           - "**/*.entitlements"
+          - "Eval/**"            # evaluation code ships in the eval tool and tests, not the app
     dependencies:
       - package: FluidAudio
     info:
@@ -52,3 +53,17 @@ targets:
         ENABLE_PREVIEWS: YES
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Minits/Minits-macOS.entitlements
         "ENABLE_HARDENED_RUNTIME[sdk=macosx*]": YES
+
+  # Unit tests for the evaluation scorer. Compiles Minits/Eval directly (no app host, no FluidAudio),
+  # so they run fast on a Mac: xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'
+  MinitsEvalTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/MinitsEvalTests
+      - Minits/Eval
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.evaltests
