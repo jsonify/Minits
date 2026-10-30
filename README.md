@@ -46,7 +46,8 @@ Minits/
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Apple Intelligence draft, or outline fallback
   UI/                       Screens (roll call, recording, review, transcript, minutes)
-  Eval/                     Speaker-attribution scoring (not part of the app; used by tests and the eval tool)
+  Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
+Tools/minits-eval/          `minits-eval` command-line tool (macOS): label, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
 Tests/MinitsTests/          Tests for Voice/ (VoiceTuning, a VoiceEngine snapshot test; needs FluidAudio + a Mac)
 docs/specs/                 Feature specs
@@ -65,6 +66,18 @@ xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
 ## Tuning
 
 Voice-matching thresholds live in `VoiceTuning` at the top of `VoiceEngine.swift` and default to today's hand-picked values (`VoiceEngine.shared` always uses the defaults). Raise `sureSimilarity` to flag more lines for review; lower it to flag fewer. The eval harness (`docs/specs/speaker-eval-harness/`) overrides these per run instead of editing code.
+
+## Measuring speaker attribution
+
+`minits-eval` scores `VoiceEngine` against labeled sessions in `eval/` (audio is git-ignored; see the spec for the folder layout).
+
+```bash
+xcodebuild -scheme minits-eval build
+minits-eval label eval/2026-11-02-pub            # labels.json from tracks/<member>.wav (clap-synced)
+minits-eval run eval/ --out before.json          # per-session and overall metrics
+minits-eval run eval/ --sure-similarity 0.55 --out after.json
+minits-eval compare before.json after.json
+```
 
 ## Tips for good results
 

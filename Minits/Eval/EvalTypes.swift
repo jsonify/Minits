@@ -28,6 +28,18 @@ struct GroundTruth: Codable, Equatable, Sendable {
     var intervals: [LabeledInterval]
     /// Stretches of clearly non-member speech; a Guest attribution is correct here.
     var nonMemberSpans: [TimeSpan] = []
+
+    init(intervals: [LabeledInterval], nonMemberSpans: [TimeSpan] = []) {
+        self.intervals = intervals
+        self.nonMemberSpans = nonMemberSpans
+    }
+
+    /// labels.json is hand-editable, so `nonMemberSpans` may be left out.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        intervals = try container.decode([LabeledInterval].self, forKey: .intervals)
+        nonMemberSpans = try container.decodeIfPresent([TimeSpan].self, forKey: .nonMemberSpans) ?? []
+    }
 }
 
 /// One line of transcript as the engine produced it, reduced to what scoring needs.
