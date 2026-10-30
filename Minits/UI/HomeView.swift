@@ -181,7 +181,7 @@ private struct KindTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Starts a \(kind.label.lowercased())")
+        .accessibilityHint("Opens roll call for a new \(kind.label.lowercased())")
     }
 }
 
