@@ -4,7 +4,7 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
 ## How it works
 
-1. **Pick the kind of meeting.** *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. The app remembers your last choice.
+1. **Pick the kind of meeting.** The home screen's **Start a meeting** panel has one tile per kind, each with an example of what you'll get: *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. Tapping a tile opens the roll call with that kind selected (you can still switch it there). Once you have a meeting, the app tags your last choice as *Last used*.
 2. **Voice roll call.** Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
 3. **Record.** One tap. Keeps recording with the screen locked. In a board meeting, tap **Mark motion** when someone makes a motion or the board votes; in an ad-hoc meeting, tap **Mark moment** when something is decided.
 4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English).
