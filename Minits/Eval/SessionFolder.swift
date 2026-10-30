@@ -7,6 +7,22 @@ struct SessionConfig: Codable, Equatable, Sendable {
     var members: [String] = []
     /// Seconds to add to a member's track timestamps to land on table.wav's timeline. Overrides clap sync.
     var trackOffsetsSeconds: [String: Double] = [:]
+
+    init(venue: String? = nil, notes: String? = nil, members: [String] = [], trackOffsetsSeconds: [String: Double] = [:]) {
+        self.venue = venue
+        self.notes = notes
+        self.members = members
+        self.trackOffsetsSeconds = trackOffsetsSeconds
+    }
+
+    /// session.json is hand-written, so everything is optional (offsets usually come from the clap).
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        venue = try container.decodeIfPresent(String.self, forKey: .venue)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        members = try container.decodeIfPresent([String].self, forKey: .members) ?? []
+        trackOffsetsSeconds = try container.decodeIfPresent([String: Double].self, forKey: .trackOffsetsSeconds) ?? [:]
+    }
 }
 
 enum SessionFolderError: LocalizedError, Equatable {

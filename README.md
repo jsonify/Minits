@@ -52,7 +52,7 @@ Minits/
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
   UI/                       Screens (roll call, recording, review, transcript, minutes/summary)
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
-Tools/minits-eval/          `minits-eval` command-line tool (macOS): label, run, compare
+Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
 Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
 docs/specs/                 Feature specs
@@ -74,11 +74,13 @@ Voice-matching thresholds live in `VoiceTuning` at the top of `VoiceEngine.swift
 
 ## Measuring speaker attribution
 
-`minits-eval` scores `VoiceEngine` against labeled sessions in `eval/` (audio is git-ignored; see the spec for the folder layout).
+`minits-eval` scores `VoiceEngine` against labeled sessions in `eval/` (audio is git-ignored; see the spec for the folder layout). To record a session, follow [`docs/specs/speaker-eval-harness/recording-guide.md`](docs/specs/speaker-eval-harness/recording-guide.md).
 
 ```bash
 xcodebuild -scheme minits-eval build
+minits-eval check eval/2026-11-02-pub            # missing/misnamed files, unconverted .m4a, short samples, no clap
 minits-eval label eval/2026-11-02-pub            # labels.json from tracks/<member>.wav (clap-synced)
+minits-eval spotcheck eval/2026-11-02-pub        # 20 clips + checklist to verify labels by ear (aim for 19/20)
 minits-eval run eval/ --out before.json          # per-session and overall metrics
 minits-eval run eval/ --sure-similarity 0.55 --out after.json
 minits-eval compare before.json after.json

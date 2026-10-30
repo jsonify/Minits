@@ -64,6 +64,12 @@ final class SessionFolderTests: XCTestCase {
         XCTAssertEqual(try session.config(), SessionConfig())
     }
 
+    func testConfigWithoutOffsetsDecodes() throws {
+        let session = SessionFolder(url: try makeSession("s", files: ["table.wav"]))
+        try Data(#"{"venue": "pub", "members": ["Maria", "Dev"]}"#.utf8).write(to: session.configURL)
+        XCTAssertEqual(try session.config(), SessionConfig(venue: "pub", members: ["Maria", "Dev"]))
+    }
+
     func testConfigReadsOffsets() throws {
         let session = SessionFolder(url: try makeSession("s", files: ["table.wav"]))
         try Data(#"{"venue": "pub", "members": ["Maria", "Dev"], "trackOffsetsSeconds": {"Dev": 0.42}}"#.utf8)
