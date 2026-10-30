@@ -10,6 +10,10 @@ enum Theme {
     static let border = Color(hex: 0xC9D3DE)
     static let accent = Color(hex: 0x1F4E79)
     static let accentSoft = Color(hex: 0xEAF1F8)
+    /// Darker end of the accent gradient behind the home screen's start panel.
+    static let accentDeep = Color(hex: 0x14365A)
+    /// Secondary text on an accent background.
+    static let onAccentSecondary = Color(hex: 0xC9DAEA)
     static let success = Color(hex: 0x1E6B3A)
     static let successSoft = Color(hex: 0xE3F2E8)
     static let danger = Color(hex: 0xB42318)
