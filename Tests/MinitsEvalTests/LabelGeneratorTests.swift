@@ -79,6 +79,15 @@ final class LabelGeneratorTests: XCTestCase {
         XCTAssertEqual(offset ?? .nan, 0.42, accuracy: 1.0 / Double(rate))
     }
 
+    func testMutedClapIsNotLabeled() {
+        var mine = track(seconds: 6, bursts: [(4.0, 5.0, 0.3)])
+        mine[Int(2.0 * Double(rate))] = 0.95
+        let muted = LabelGenerator.mutingClap(mine, sampleRate: rate)
+        let intervals = LabelGenerator.intervals(from: [.init(speaker: "Dev", samples: muted)], sampleRate: rate)
+        XCTAssertEqual(intervals.count, 1)
+        assertInterval(intervals.first, "Dev", 4.0, 5.0)
+    }
+
     func testClapSyncNeedsSound() {
         let silence = [Float](repeating: 0, count: rate)
         XCTAssertNil(LabelGenerator.clapOffset(track: silence, table: silence, sampleRate: rate))

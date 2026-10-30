@@ -15,6 +15,9 @@ packages:
   FluidAudio:
     url: https://github.com/FluidInference/FluidAudio.git
     minorVersion: 0.18.0
+  swift-argument-parser:
+    url: https://github.com/apple/swift-argument-parser.git
+    minorVersion: 1.5.0
 
 targets:
   Minits:
@@ -84,3 +87,22 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.tests
+
+  # Command-line speaker eval: `minits-eval run eval/`, `label <session>`, `compare a.json b.json`.
+  # Compiles VoiceEngine.swift and Minits/Eval directly, so the engine stays single-sourced with the app:
+  # xcodebuild -scheme minits-eval build
+  minits-eval:
+    type: tool
+    platform: macOS
+    sources:
+      - Tools/minits-eval
+      - Minits/Eval
+      - Minits/Voice/VoiceEngine.swift
+    dependencies:
+      - package: FluidAudio
+      - package: swift-argument-parser
+        product: ArgumentParser
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.eval

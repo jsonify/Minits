@@ -78,6 +78,18 @@ enum LabelGenerator {
         return Double(inTable - inTrack) / Double(sampleRate)
     }
 
+    /// Silences the sync clap so it isn't labeled as speech.
+    static func mutingClap(_ samples: [Float], sampleRate: Int) -> [Float] {
+        guard let clap = clapIndex(samples, sampleRate: sampleRate) else { return samples }
+        let reach = Int(clapMuteSeconds * Double(sampleRate))
+        var muted = samples
+        for i in max(0, clap - reach)..<min(samples.count, clap + reach) { muted[i] = 0 }
+        return muted
+    }
+
+    /// How much audio either side of the clap peak `mutingClap` silences.
+    static let clapMuteSeconds = 0.25
+
     // MARK: Helpers
 
     /// RMS of each whole frame.

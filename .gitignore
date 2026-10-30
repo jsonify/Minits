@@ -11,3 +11,6 @@ build/
 
 # macOS
 .DS_Store
+
+# Eval recordings stay local (real people); only labels.json and session.json are committable
+eval/**/*.wav
