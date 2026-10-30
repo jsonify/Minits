@@ -71,7 +71,7 @@ targets:
         SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.evaltests
 
-  # Tests for Minits/Voice (VoiceEngine, VoiceTuning). Compiles against FluidAudio, so these are
+  # Tests for Minits/Voice (VoiceEngine, VoiceTuning) and Minits/Minutes (outline fallback). Compiles against FluidAudio, so these are
   # slower than MinitsEvalTests and the snapshot test needs FluidAudio's models downloaded once:
   # xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
   MinitsTests:
@@ -80,6 +80,8 @@ targets:
     sources:
       - Tests/MinitsTests
       - Minits/Voice
+      - Minits/Minutes
+      - Minits/Models
     dependencies:
       - package: FluidAudio
     settings:

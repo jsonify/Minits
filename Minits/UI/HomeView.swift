@@ -16,7 +16,7 @@ struct HomeView: View {
                     Text("Minits")
                         .font(Theme.heading(34))
                         .foregroundStyle(Theme.ink)
-                    Text("Record the board meeting. Get minutes with names attached.")
+                    Text("Record a meeting. Get minutes or a summary with names attached.")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.secondaryInk)
                 }
@@ -134,7 +134,7 @@ private struct MeetingRow: View {
         case .recording: pill("Recording", Theme.danger, Theme.dangerSoft)
         case .processing: pill("Working", Theme.accent, Theme.accentSoft)
         case .needsReview: pill("Review \(meeting.linesNeedingReview.count)", Theme.warning, Theme.motionSoft)
-        case .ready: pill(meeting.minutes == nil ? "Transcript" : "Minutes", Theme.success, Theme.successSoft)
+        case .ready: pill(meeting.minutes == nil ? "Transcript" : meeting.kind.documentName, Theme.success, Theme.successSoft)
         case .failed: pill("Needs retry", Theme.danger, Theme.dangerSoft)
         }
     }

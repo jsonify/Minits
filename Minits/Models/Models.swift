@@ -37,6 +37,39 @@ enum MeetingStatus: String, Codable {
     case recording, processing, needsReview, ready, failed
 }
 
+/// What the meeting is, which decides what gets written afterwards.
+enum MeetingKind: String, Codable, CaseIterable, Identifiable {
+    /// Formal minutes: attendance, motions, votes, action items.
+    case board
+    /// A plain summary: what was discussed, decisions, action items.
+    case adHoc
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .board: return "Board meeting"
+        case .adHoc: return "Ad-hoc meeting"
+        }
+    }
+
+    /// What the written-up result is called on screen.
+    var documentName: String {
+        switch self {
+        case .board: return "Minutes"
+        case .adHoc: return "Summary"
+        }
+    }
+
+    /// What tapping the mark button records during the meeting.
+    var markName: String {
+        switch self {
+        case .board: return "motion"
+        case .adHoc: return "moment"
+        }
+    }
+}
+
 @Model
 final class Meeting {
     var id: UUID = UUID()
@@ -47,7 +80,9 @@ final class Meeting {
     var audioFileName: String = ""
     var statusRaw: String = MeetingStatus.recording.rawValue
     var errorMessage: String?
-    /// Seconds into the recording where "Mark motion" was tapped.
+    /// Meetings recorded before ad-hoc meetings existed decode as board meetings.
+    var kindRaw: String = MeetingKind.board.rawValue
+    /// Seconds into the recording where "Mark motion" (or "Mark moment") was tapped.
     var motionMarks: [Double] = []
     /// Members who were present (had their voice on file when the meeting started).
     var attendeeIDs: [UUID] = []
@@ -55,9 +90,10 @@ final class Meeting {
     @Relationship(deleteRule: .cascade, inverse: \TranscriptLine.meeting)
     var lines: [TranscriptLine] = []
 
-    init(title: String, attendeeIDs: [UUID]) {
+    init(title: String, kind: MeetingKind = .board, attendeeIDs: [UUID]) {
         self.id = UUID()
         self.title = title
+        self.kindRaw = kind.rawValue
         self.startedAt = Date()
         self.attendeeIDs = attendeeIDs
         self.audioFileName = "\(id.uuidString).wav"
@@ -66,6 +102,11 @@ final class Meeting {
     var status: MeetingStatus {
         get { MeetingStatus(rawValue: statusRaw) ?? .failed }
         set { statusRaw = newValue.rawValue }
+    }
+
+    var kind: MeetingKind {
+        get { MeetingKind(rawValue: kindRaw) ?? .board }
+        set { kindRaw = newValue.rawValue }
     }
 
     var audioURL: URL { Storage.recordingsFolder.appendingPathComponent(audioFileName) }

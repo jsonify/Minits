@@ -1,14 +1,19 @@
 # Minits
 
-Record a board meeting on one iPhone (or Mac), find out who said what, and get draft minutes. Everything runs on the device: the recording, each member's voiceprint, the transcript and the minutes never leave it.
+Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who said what, and get draft minutes or a summary. Everything runs on the device: the recording, each member's voiceprint, the transcript and the minutes or summary never leave it.
 
 ## How it works
 
-1. **Voice roll call.** Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings.
-2. **Record.** One tap. Keeps recording with the screen locked. Tap **Mark motion** when someone makes a motion or the board votes.
-3. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English).
-4. **Review.** Lines the app isn't sure about are flagged. Play the line, tap the right name. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines.
-5. **Minutes.** On iOS 26 / macOS 26 with Apple Intelligence, the minutes are drafted on-device (attendance, motions with mover/seconder/vote, action items). Otherwise you get an outline with each marked motion quoted from the transcript.
+1. **Pick the kind of meeting.** *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. The app remembers your last choice.
+2. **Voice roll call.** Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
+3. **Record.** One tap. Keeps recording with the screen locked. In a board meeting, tap **Mark motion** when someone makes a motion or the board votes; in an ad-hoc meeting, tap **Mark moment** when something is decided.
+4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English).
+5. **Review.** Lines the app isn't sure about are flagged. Play the line, tap the right name. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines.
+6. **Minutes or summary.** On iOS 26 / macOS 26 with Apple Intelligence, the write-up is drafted on-device:
+   - *Board meeting:* formal minutes (attendance, discussion, motions with mover/seconder/vote, action items).
+   - *Ad-hoc meeting:* a summary (what it was about, topics discussed, decisions, action items, open questions).
+
+   Without Apple Intelligence you get an outline built from the transcript instead: likely decisions and action items pulled out by phrases like "agreed" or "I'll", each marked spot quoted, and (for ad-hoc meetings) the full transcript.
 
 The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline.
 
@@ -44,12 +49,12 @@ Minits/
   Models/Models.swift       SwiftData: Member, Meeting, TranscriptLine
   Audio/                    16 kHz mono WAV recorder, clip playback
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
-  Minutes/MinutesWriter.swift  Apple Intelligence draft, or outline fallback
-  UI/                       Screens (roll call, recording, review, transcript, minutes)
+  Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
+  UI/                       Screens (roll call, recording, review, transcript, minutes/summary)
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): label, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
-Tests/MinitsTests/          Tests for Voice/ (VoiceTuning, a VoiceEngine snapshot test; needs FluidAudio + a Mac)
+Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
 docs/specs/                 Feature specs
 ```
 
