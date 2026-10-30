@@ -49,6 +49,16 @@ enum ProcessingStage: Sendable, Equatable {
     }
 }
 
+/// Tuning knobs for voice matching (cosine similarity of WeSpeaker voiceprints), broken out so the
+/// eval CLI can override them without touching `VoiceEngine` itself.
+/// Same person usually scores well above 0.5; different people usually below 0.3.
+struct VoiceTuning: Sendable {
+    var acceptSimilarity: Float = 0.40    // below this, a cluster stays "Guest"
+    var sureSimilarity: Float = 0.50      // below this, the line is flagged for review
+    var minimumMargin: Float = 0.06       // best vs runner-up gap; smaller gets flagged
+    var overrideGap: Float = 0.10         // a line's best match must clear its cluster's score by this to override it
+}
+
 enum VoiceEngineError: LocalizedError {
     case sampleTooShort
     case noVoiceFound
@@ -68,15 +78,15 @@ enum VoiceEngineError: LocalizedError {
 actor VoiceEngine {
     static let shared = VoiceEngine()
 
-    // Tuning knobs for voice matching (cosine similarity of WeSpeaker voiceprints).
-    // Same person usually scores well above 0.5; different people usually below 0.3.
-    private let acceptSimilarity: Float = 0.40   // below this, a cluster stays "Guest"
-    private let sureSimilarity: Float = 0.50     // below this, the line is flagged for review
-    private let minimumMargin: Float = 0.06      // best vs runner-up gap; smaller gets flagged
+    private let tuning: VoiceTuning
     private let sampleRate = 16_000
 
     private var diarizer: OfflineDiarizerManager?
     private var asr: AsrManager?
+
+    init(tuning: VoiceTuning = VoiceTuning()) {
+        self.tuning = tuning
+    }
 
     // MARK: Models
 
@@ -213,13 +223,13 @@ actor VoiceEngine {
                     .sorted { $0.1 > $1.1 }
                 if let best = ranked.first {
                     let clusterScore = ranked.first { $0.0 == cluster?.id }?.1 ?? -1
-                    if best.1 >= sureSimilarity, best.1 - clusterScore > 0.10 {
+                    if best.1 >= tuning.sureSimilarity, best.1 - clusterScore > tuning.overrideGap {
                         chosen = best.0          // this line clearly sounds like someone else
                     }
                     chosenScore = ranked.first { $0.0 == chosen }?.1 ?? chosenScore
                     let runnerUp = ranked.first { $0.0 != chosen }
                     line.alternateSpeakerID = runnerUp?.0
-                    if chosen != nil, let runnerUp, chosenScore - runnerUp.1 < minimumMargin {
+                    if chosen != nil, let runnerUp, chosenScore - runnerUp.1 < tuning.minimumMargin {
                         line.needsReview = true
                         line.reviewNote = "Two members sound alike here"
                     }
@@ -229,7 +239,7 @@ actor VoiceEngine {
             if let chosen, let voice = voices.first(where: { $0.id == chosen }) {
                 line.speakerID = chosen
                 line.speakerName = voice.name
-                if chosenScore < sureSimilarity, !line.needsReview {
+                if chosenScore < tuning.sureSimilarity, !line.needsReview {
                     line.needsReview = true
                     line.reviewNote = "Not sure who's speaking"
                 }
@@ -263,7 +273,7 @@ actor VoiceEngine {
         pairs.sort { $0.score > $1.score }
         var result: [String: (id: UUID, score: Float)] = [:]
         var usedMembers = Set<UUID>()
-        for pair in pairs where pair.score >= acceptSimilarity {
+        for pair in pairs where pair.score >= tuning.acceptSimilarity {
             guard result[pair.cluster] == nil, !usedMembers.contains(pair.member) else { continue }
             result[pair.cluster] = (pair.member, pair.score)
             usedMembers.insert(pair.member)
