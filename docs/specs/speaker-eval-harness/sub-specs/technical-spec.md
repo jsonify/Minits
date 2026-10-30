@@ -52,6 +52,8 @@ Intervals may overlap (crosstalk). `nonMemberSpans` marks stretches of clearly n
 | `minits-eval label <session>` | Reads `tracks/*.wav` + offsets, computes speech activity per track (energy gate with the same shape as `trimSilence`, 20 ms frames, hangover 300 ms), resolves bleed by assigning a frame to the track with the highest energy when several are active unless both exceed `0.5 * peak` (then both, marking overlap), writes `labels.json`. |
 | `minits-eval run <dir-or-session> [flags]` | For each session: enroll each member via `VoiceEngine.voiceprint(forSampleAt:)`, call `process(meetingAt: table.wav, voices:)`, score, print. |
 | `minits-eval compare <a.json> <b.json>` | Prints metric deltas between two reports. |
+| `minits-eval check <session>` | Before labeling: lists each track's length, clap offset and enrollment length, and reports problems (missing or misnamed files, non-WAV audio, enrollment outside the app's 4-15 s) and warnings (table under 15 min, a track shorter than the table, no clap). Exits non-zero on problems. |
+| `minits-eval spotcheck <session> [--count 20]` | After labeling: cuts `count` labeled intervals (≥ 1 s, evenly spread, deterministic) from `table.wav` into `spotcheck/` with a `checklist.md` to fill in by ear. Bar: 19 of 20 correct. |
 
 Flags for `run`: `--accept-similarity`, `--sure-similarity`, `--minimum-margin`, `--override-gap`, `--out report.json`.
 

@@ -9,7 +9,7 @@ struct MinitsEval: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "minits-eval",
         abstract: "Measure who-said-what accuracy on recorded sessions.",
-        subcommands: [Run.self, Label.self, Compare.self])
+        subcommands: [Run.self, Label.self, Compare.self, Check.self, SpotCheckCommand.self])
 }
 
 /// Engine output is scored at the same rate the engine reads audio.
@@ -56,7 +56,7 @@ struct Run: AsyncParsableCommand {
                               speaker: line.speakerID == nil ? nil : line.speakerName,
                               needsReview: line.needsReview, confidence: line.confidence)
             }
-            let meetingSeconds = try Self.duration(of: session.tableURL)
+            let meetingSeconds = try duration(of: session.tableURL)
             scores.append((session.name, SessionScore(lines: Scorer.score(lines: lines, truth: truth),
                                                       meetingSeconds: meetingSeconds)))
         }
@@ -79,11 +79,6 @@ struct Run: AsyncParsableCommand {
     /// Fixed IDs so a run never depends on random UUIDs.
     private static func stableID(_ index: Int) -> UUID {
         UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1))!
-    }
-
-    private static func duration(of url: URL) throws -> Double {
-        let file = try AVAudioFile(forReading: url)
-        return Double(file.length) / file.fileFormat.sampleRate
     }
 }
 
@@ -142,7 +137,103 @@ struct Compare: ParsableCommand {
     }
 }
 
+// MARK: check
+
+struct Check: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Check a freshly copied session folder for missing, misnamed or unconverted files.")
+
+    @Argument(help: "The session folder.")
+    var session: String
+
+    func run() async throws {
+        let folder = SessionFolder(url: URL(fileURLWithPath: session))
+        let files = FileManager.default
+        var inventory = SessionInventory(config: try folder.config())
+
+        for sub in ["", "enroll", "tracks"] {
+            let dir = sub.isEmpty ? folder.url : folder.url.appendingPathComponent(sub)
+            for url in (try? files.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+            where SessionCheck.audioExtensions.contains(url.pathExtension.lowercased()) {
+                inventory.unconvertedAudio.append(sub.isEmpty ? url.lastPathComponent : "\(sub)/\(url.lastPathComponent)")
+            }
+        }
+
+        let converter = AudioConverter()
+        var table: [Float]?
+        if files.fileExists(atPath: folder.tableURL.path) {
+            inventory.tableSeconds = try duration(of: folder.tableURL)
+            table = try converter.resampleAudioFile(folder.tableURL)
+        }
+        for sample in (try? folder.enrollmentSamples()) ?? [] {
+            inventory.enrollSeconds[sample.member] = try duration(of: sample.url)
+        }
+        for track in (try? folder.trackFiles()) ?? [] {
+            inventory.trackSeconds[track.member] = try duration(of: track.url)
+            if let table, let offset = LabelGenerator.clapOffset(
+                track: try converter.resampleAudioFile(track.url), table: table, sampleRate: sampleRate) {
+                inventory.clapOffsets[track.member] = offset
+            }
+        }
+
+        if let seconds = inventory.tableSeconds { print("table.wav  \(SessionCheck.clock(seconds))") }
+        for (member, seconds) in inventory.trackSeconds.sorted(by: { $0.key < $1.key }) {
+            let offset = inventory.clapOffsets[member].map { String(format: "clap offset %.3f s", $0) } ?? "no clap"
+            let enroll = inventory.enrollSeconds[member].map { String(format: "enroll %.1f s", $0) } ?? "no enroll"
+            print("\(member)  track \(SessionCheck.clock(seconds)), \(offset), \(enroll)")
+        }
+
+        let findings = SessionCheck.findings(for: inventory)
+        for finding in findings { print("\(finding.severity.rawValue.uppercased()): \(finding.message)") }
+        let problems = findings.filter { $0.severity == .problem }.count
+        print(problems == 0 ? "OK: ready for `minits-eval label`." : "\(problems) problem(s) to fix before labeling.")
+        if problems > 0 { throw ExitCode.failure }
+    }
+}
+
+// MARK: spotcheck
+
+struct SpotCheckCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "spotcheck",
+        abstract: "Cut labeled intervals from table.wav into spotcheck/ with a checklist, to verify labels by ear.")
+
+    @Argument(help: "The session folder (after `label`).")
+    var session: String
+
+    @Option(help: "How many intervals to check.") var count = SpotCheck.defaultCount
+
+    func run() async throws {
+        let folder = SessionFolder(url: URL(fileURLWithPath: session))
+        let clips = SpotCheck.clips(from: try folder.labels(), count: count)
+        let out = folder.url.appendingPathComponent("spotcheck")
+        try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+
+        let table = try AVAudioFile(forReading: folder.tableURL)
+        let rate = table.processingFormat.sampleRate
+        for clip in clips {
+            let start = AVAudioFramePosition(clip.span.start * rate)
+            let frames = AVAudioFrameCount(min(Double(table.length - start), clip.span.duration * rate))
+            guard frames > 0, let buffer = AVAudioPCMBuffer(pcmFormat: table.processingFormat, frameCapacity: frames) else { continue }
+            table.framePosition = start
+            try table.read(into: buffer, frameCount: frames)
+            let file = try AVAudioFile(forWriting: out.appendingPathComponent(clip.fileName), settings: table.fileFormat.settings,
+                                       commonFormat: table.processingFormat.commonFormat,
+                                       interleaved: table.processingFormat.isInterleaved)
+            try file.write(from: buffer)
+        }
+        let checklist = out.appendingPathComponent("checklist.md")
+        try Data(SpotCheck.checklist(session: folder.name, clips: clips).utf8).write(to: checklist)
+        log("Wrote \(clips.count) clips and \(checklist.path)")
+    }
+}
+
 // MARK: Helpers
+
+private func duration(of url: URL) throws -> Double {
+    let file = try AVAudioFile(forReading: url)
+    return Double(file.length) / file.fileFormat.sampleRate
+}
 
 private func log(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))

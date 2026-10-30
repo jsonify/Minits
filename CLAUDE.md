@@ -9,3 +9,7 @@ Every PR description has a **How to test** section written for the person mergin
 - **Knock-on effects.** Name screens or flows the change could affect indirectly (for example, a `VoiceEngine` change shows up in Review flags and in who each line is attributed to), and say how to spot a regression.
 - **No manual checks needed?** Say so in one line and why (for example, "eval-only code; no app or UI change").
 - **Automated tests.** Then list what was run and the result (`xcodebuild test -scheme MinitsEvalTests`, `MinitsTests`, app builds for iOS and macOS). Mark anything not run as not run.
+
+## README: keep it current
+
+Every change that adds or changes a feature updates `README.md` in the same PR: what it does, how to use it (commands, flags, screens), and the project layout if files moved or were added. A feature isn't done until the README describes it. If a PR needs no README change, say why in its description.
