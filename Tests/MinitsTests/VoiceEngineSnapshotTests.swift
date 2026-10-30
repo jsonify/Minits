@@ -4,8 +4,9 @@ import XCTest
 /// output with default tuning. Runs the real FluidAudio diarizer + ASR pipeline, so it needs
 /// network once (model download) and does not run on Macs without a Neural Engine.
 ///
-/// To (re)record the golden snapshot after an intentional engine change, run once with
-/// `RECORD_SNAPSHOT=1` set, inspect the diff on `Fixtures/meeting-snapshot.json`, and commit it.
+/// To (re)record the golden snapshot after an intentional engine change, delete
+/// `Fixtures/meeting-snapshot.json`, run once with `TEST_RUNNER_RECORD_SNAPSHOT=1` set (xcodebuild
+/// only forwards `TEST_RUNNER_`-prefixed variables to the test process), inspect it, and commit it.
 final class VoiceEngineSnapshotTests: XCTestCase {
     /// Mirrors `ProcessedLine` for comparison and JSON snapshotting without changing app code.
     private struct SnapshotLine: Codable, Equatable {
@@ -63,7 +64,7 @@ final class VoiceEngineSnapshotTests: XCTestCase {
                 XCTFail("Recorded snapshot to \(snapshotURL.path) — inspect it, then rerun without RECORD_SNAPSHOT.")
             } else {
                 throw XCTSkip(
-                    "No golden snapshot at \(snapshotURL.path). Run once with RECORD_SNAPSHOT=1 on an " +
+                    "No golden snapshot at \(snapshotURL.path). Run once with TEST_RUNNER_RECORD_SNAPSHOT=1 on an " +
                     "Apple Silicon Mac, inspect the output, and commit it.")
             }
             return
