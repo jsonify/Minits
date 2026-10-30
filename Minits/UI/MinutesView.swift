@@ -6,7 +6,7 @@ import UIKit
 import AppKit
 #endif
 
-/// Screen A4: the drafted minutes, editable and shareable.
+/// Screen A4: the drafted minutes (board meeting) or summary (ad-hoc meeting), editable and shareable.
 struct MinutesView: View {
     @Environment(\.modelContext) private var context
     @Bindable var meeting: Meeting
@@ -30,11 +30,9 @@ struct MinutesView: View {
     private var startView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Draft the minutes")
+                Text(meeting.kind == .board ? "Draft the minutes" : "Write a summary")
                     .font(Theme.heading(28))
-                Text(MinutesWriter.aiAvailable
-                     ? "Apple Intelligence will read the transcript on this device and write formal minutes: attendance, motions with who moved and seconded, votes, and action items. You can edit everything after."
-                     : MinutesWriter.aiUnavailableReason)
+                Text(MinutesWriter.aiAvailable ? aiDescription : MinutesWriter.aiUnavailableReason)
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.secondaryInk)
                 if !meeting.linesNeedingReview.isEmpty {
@@ -51,13 +49,22 @@ struct MinutesView: View {
                     if working {
                         HStack(spacing: 8) { ProgressView().tint(.white); Text(progressText.isEmpty ? "Working…" : progressText) }
                     } else {
-                        Text(MinutesWriter.aiAvailable ? "Draft the minutes" : "Make an outline")
+                        Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
                     }
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(working)
             }
             .padding(20)
+        }
+    }
+
+    private var aiDescription: String {
+        switch meeting.kind {
+        case .board:
+            return "Apple Intelligence will read the transcript on this device and write formal minutes: attendance, motions with who moved and seconded, votes, and action items. You can edit everything after."
+        case .adHoc:
+            return "Apple Intelligence will read the transcript on this device and write a summary: what was discussed, decisions, action items, and open questions. You can edit everything after."
         }
     }
 
@@ -120,6 +127,7 @@ struct MinutesView: View {
         progressText = ""
         let byID = Dictionary(uniqueKeysWithValues: members.map { ($0.id, $0) })
         let input = MinutesInput(
+            kind: meeting.kind,
             title: meeting.title,
             date: meeting.startedAt,
             duration: meeting.durationSeconds,
@@ -134,7 +142,7 @@ struct MinutesView: View {
             try? context.save()
         } catch {
             errorText = "Couldn't write the draft: \(error.localizedDescription). Here's an outline instead."
-            meeting.minutes = MinutesWriter.outline(input, notes: nil)
+            meeting.minutes = MinutesWriter.outline(input)
         }
         working = false
     }

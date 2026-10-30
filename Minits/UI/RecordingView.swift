@@ -50,12 +50,12 @@ struct RecordingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
                     if meeting.motionMarks.isEmpty {
-                        Text("Tap **Mark motion** whenever someone makes a motion or the board votes. Those spots get extra attention in the minutes.")
+                        Text(markHelp)
                             .font(.system(size: 15))
                             .foregroundStyle(Theme.secondaryInk)
                     }
                     ForEach(Array(meeting.motionMarks.enumerated()), id: \.offset) { index, mark in
-                        Label("Motion \(index + 1) marked at \(mark.clock)", systemImage: "bookmark.fill")
+                        Label("\(meeting.kind.markName.capitalized) \(index + 1) marked at \(mark.clock)", systemImage: "bookmark.fill")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.motion)
                             .padding(.horizontal, 12)
@@ -137,7 +137,7 @@ struct RecordingView: View {
             Button {
                 markMotion()
             } label: {
-                Label("Mark motion", systemImage: "bookmark.fill")
+                Label("Mark \(meeting.kind.markName)", systemImage: "bookmark.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.motion)
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -153,6 +153,13 @@ struct RecordingView: View {
             }
             .buttonStyle(PrimaryButtonStyle(tint: Theme.danger))
             .frame(maxWidth: 110)
+        }
+    }
+
+    private var markHelp: LocalizedStringKey {
+        switch meeting.kind {
+        case .board: return "Tap **Mark motion** whenever someone makes a motion or the board votes. Those spots get extra attention in the minutes."
+        case .adHoc: return "Tap **Mark moment** when something important is decided or agreed. Those spots get extra attention in the summary."
         }
     }
 

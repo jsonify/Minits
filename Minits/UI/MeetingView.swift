@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 #endif
 
-/// After the meeting: processing, then Review (A3), Transcript and Minutes (A4).
+/// After the meeting: processing, then Review (A3), Transcript and Minutes or Summary (A4).
 struct MeetingView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Member.sortOrder) private var members: [Member]
@@ -32,6 +32,8 @@ struct MeetingView: View {
                         ForEach(Tab.allCases) { tab in
                             if tab == .review, !meeting.linesNeedingReview.isEmpty {
                                 Text("Review · \(meeting.linesNeedingReview.count)").tag(tab)
+                            } else if tab == .minutes {
+                                Text(meeting.kind.documentName).tag(tab)
                             } else {
                                 Text(tab.rawValue).tag(tab)
                             }

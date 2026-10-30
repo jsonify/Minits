@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// Screen A1: learn each member's voice, pick who's here, start the meeting.
+/// Screen A1: pick the kind of meeting, learn each member's voice, pick who's here, start the meeting.
 struct RollCallView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -12,15 +12,33 @@ struct RollCallView: View {
     @State private var addingMember = false
     @State private var pendingSample: Member?
     @State private var micDenied = false
-    @State private var meetingTitle = Self.defaultTitle()
+    @AppStorage("lastMeetingKind") private var kind: MeetingKind = .board
+    @State private var meetingTitle = ""
+    /// The title follows the meeting kind until the user types their own.
+    @State private var titleEdited = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
+                    Picker("Kind of meeting", selection: $kind) {
+                        ForEach(MeetingKind.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(kind == .board
+                         ? "Formal minutes afterwards: attendance, motions, votes, action items."
+                         : "A summary afterwards: what was discussed, decisions, action items.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.secondaryInk)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Voice roll call")
                         .font(Theme.heading(32))
-                    Text("Pass the phone, or tap Record next to a name. Each member says their name and role in one sentence so Minits learns their voice. Voices are saved for next time.")
+                    Text(kind == .board
+                         ? "Pass the phone, or tap Record next to a name. Each member says their name and role in one sentence so Minits learns their voice. Voices are saved for next time."
+                         : "Optional. Record a voice for anyone you want named in the transcript; everyone else shows up as Guest 1, Guest 2… Voices are saved for next time.")
                         .font(.system(size: 15))
                         .foregroundStyle(Theme.secondaryInk)
                 }
@@ -57,7 +75,9 @@ struct RollCallView: View {
                     Text("Meeting name")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.secondaryInk)
-                    TextField("Meeting name", text: $meetingTitle)
+                    TextField("Meeting name", text: Binding(
+                        get: { meetingTitle },
+                        set: { meetingTitle = $0; titleEdited = true }))
                         .textFieldStyle(.plain)
                         .font(.system(size: 16))
                         .card()
@@ -74,6 +94,8 @@ struct RollCallView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Theme.ground)
+        .onAppear { applyDefaults(for: kind) }
+        .onChange(of: kind) { _, kind in applyDefaults(for: kind) }
         .safeAreaInset(edge: .bottom) { footer }
         .navigationTitle("Step 1 of 2")
         .inlineTitle()
@@ -109,7 +131,7 @@ struct RollCallView: View {
                 Task { await startMeeting() }
             }
             .buttonStyle(PrimaryButtonStyle())
-            if presentWithVoice.isEmpty {
+            if presentWithVoice.isEmpty, kind == .board {
                 Text("You can start without voice samples, but everyone will show up as Guest 1, Guest 2…")
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.secondaryInk)
@@ -121,6 +143,13 @@ struct RollCallView: View {
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity)
         .background(Theme.ground)
+    }
+
+    /// Board meetings start with every member here; ad-hoc meetings start with nobody, so saved
+    /// board voices aren't matched against whoever happens to be in the room.
+    private func applyDefaults(for kind: MeetingKind) {
+        absent = kind == .board ? [] : Set(members.map(\.id))
+        if !titleEdited { meetingTitle = Self.defaultTitle(for: kind) }
     }
 
     private func toggle(_ member: Member) {
@@ -139,15 +168,19 @@ struct RollCallView: View {
         }
         let title = meetingTitle.trimmingCharacters(in: .whitespaces)
         let meeting = Meeting(
-            title: title.isEmpty ? Self.defaultTitle() : title,
+            title: title.isEmpty ? Self.defaultTitle(for: kind) : title,
+            kind: kind,
             attendeeIDs: members.filter { !absent.contains($0.id) }.map(\.id))
         context.insert(meeting)
         try? context.save()
         router.path.append(.recording(meeting))
     }
 
-    private static func defaultTitle() -> String {
-        "\(Date().formatted(.dateTime.month(.wide))) Board Meeting"
+    private static func defaultTitle(for kind: MeetingKind) -> String {
+        switch kind {
+        case .board: return "\(Date().formatted(.dateTime.month(.wide))) Board Meeting"
+        case .adHoc: return "Meeting, \(Date().formatted(.dateTime.month(.abbreviated).day()))"
+        }
     }
 }
 
