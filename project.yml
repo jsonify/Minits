@@ -18,6 +18,10 @@ packages:
   swift-argument-parser:
     url: https://github.com/apple/swift-argument-parser.git
     minorVersion: 1.5.0
+  # The SK-1 look (tokens and SwiftUI components), shared with Skreener.
+  SK1Kit:
+    url: https://github.com/jsonify/SK1Kit.git
+    branch: main
 
 targets:
   Minits:
@@ -30,6 +34,10 @@ targets:
           - "Eval/**"            # evaluation code ships in the eval tool and tests, not the app
     dependencies:
       - package: FluidAudio
+      - package: SK1Kit
+        product: SK1Tokens
+      - package: SK1Kit
+        product: SK1UI
     info:
       path: Minits/Info.plist
       properties:
