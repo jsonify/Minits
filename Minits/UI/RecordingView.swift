@@ -1,3 +1,5 @@
+import SK1Tokens
+import SK1UI
 import SwiftData
 import SwiftUI
 #if os(iOS)
@@ -5,6 +7,10 @@ import UIKit
 #endif
 
 /// Screen A2: the meeting is being recorded. Keeps going with the screen locked.
+///
+/// SK-1 look: the meeting's title, one big LCD (REC lamp, kind and head count, the elapsed time in seven-segment
+/// digits, the input level), notes, the marks as LCD chips in a sunken tray, and the transport keys. Mark is the one
+/// orange key; End is charcoal with a red lamp and asks first.
 struct RecordingView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -14,67 +20,29 @@ struct RecordingView: View {
     @State private var recorder = AudioRecorder()
     @State private var startError: String?
     @State private var confirmingEnd = false
-    @State private var flashMark = false
+
+    private let marksEnd = "marks-end"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header
+        VStack(alignment: .leading, spacing: 14) {
+            SKCaption(meeting.title)
 
-            consentNote
+            lcd
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(recorder.isPaused ? "Paused" : "Listening")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0xC9DAEA))
-                    Spacer()
-                    Text("\(present.count) here")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0xC9DAEA))
-                }
-                LevelBars(levels: recorder.levelHistory, color: .white, height: 40)
-                    .frame(maxWidth: .infinity)
-            }
-            .padding(16)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16))
+            notes
 
-            if recorder.wasInterrupted {
-                Text("Recording paused by a call or another app. Tap Resume to keep going.")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.danger)
-            }
-            if let startError {
-                Text(startError).font(.system(size: 14)).foregroundStyle(Theme.danger)
-            }
+            marks
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    if meeting.motionMarks.isEmpty {
-                        Text(markHelp)
-                            .font(.system(size: 15))
-                            .foregroundStyle(Theme.secondaryInk)
-                    }
-                    ForEach(Array(meeting.motionMarks.enumerated()), id: \.offset) { index, mark in
-                        Label("\(meeting.kind.markName.capitalized) \(index + 1) marked at \(mark.clock)", systemImage: "bookmark.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Theme.motion)
-                            .padding(.horizontal, 12)
-                            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-                            .background(Theme.motionSoft, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                    Text("The transcript and speaker names are worked out on this device after you end the meeting.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.secondaryInk)
-                        .padding(.top, 6)
-                }
-            }
+            Text("The transcript and who said what are worked out on this device after you end the meeting.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
 
-            controls
+            transport
         }
         .padding(20)
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.ground)
+        .sk1Chassis()
         .navigationTitle("")
         .inlineTitle()
         .navigationBarBackButtonHiddenCompat()
@@ -94,65 +62,113 @@ struct RecordingView: View {
 
     private var present: [Member] { members.filter { meeting.attendeeIDs.contains($0.id) } }
 
-    private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(meeting.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.secondaryInk)
-                Text(recorder.elapsed.longClock)
-                    .font(Theme.heading(34))
-                    .monospacedDigit()
+    /// "Motion" or "Moment".
+    private var markName: String { meeting.kind.markName.capitalized }
+
+    // MARK: - LCD
+
+    private var lcd: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let recording = recorder.isRecording && !recorder.isPaused
+        return SKLCD {
+            VStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    SKLamp(color: .red, lit: recording, glow: 4, size: 7, label: "Recording", blinking: true)
+                    Text(SK1.Format.elapsedStatus(paused: recorder.isPaused))
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                    Spacer(minLength: 8)
+                    Text("\(meeting.kind.shortName) · \(present.count) HERE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1)
+                        .lineLimit(1)
+                }
+                .foregroundStyle(ink)
+
+                SKSevenSegment(SK1.Format.elapsed(recorder.elapsed), digitHeight: 52, spacing: 5)
+                    .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+
+                SKLevelMeter(levels: recorder.levelHistory, height: 40)
             }
-            Spacer()
-            HStack(spacing: 6) {
-                Circle().fill(recorder.isPaused ? Theme.secondaryInk : Theme.danger).frame(width: 8, height: 8)
-                Text(recorder.isPaused ? "Paused" : "Recording")
-            }
-            .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(recorder.isPaused ? Theme.secondaryInk : Theme.danger)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(recorder.isPaused ? Theme.hairline : Theme.dangerSoft, in: Capsule())
+            .padding(.vertical, 10)
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(lcdAccessibilityLabel))
     }
 
-    @ViewBuilder private var consentNote: some View {
+    private var lcdAccessibilityLabel: String {
+        let timer = SK1.Format.elapsedAccessibilityLabel(
+            seconds: recorder.elapsed, recording: recorder.isRecording, paused: recorder.isPaused)
+        return "\(timer), \(present.count) here"
+    }
+
+    // MARK: - Notes
+
+    @ViewBuilder private var notes: some View {
+        if recorder.wasInterrupted {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    SKLamp(color: .warning, lit: true, label: "Interrupted")
+                    SKCaption("Interrupted")
+                }
+                Text("Paused by a call or another app. Tap Resume to keep going.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        if let startError {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                SKLamp(color: .danger, lit: true, label: "Error")
+                Text(startError)
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
         if recorder.elapsed < 60 {
-            Label("Let everyone know the meeting is being recorded.", systemImage: "info.circle")
-                .font(.system(size: 14))
-                .foregroundStyle(Theme.secondaryInk)
+            Text("Let everyone know the meeting is being recorded.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var controls: some View {
-        HStack(spacing: 12) {
-            Button {
-                recorder.isPaused ? recorder.resume() : recorder.pause()
-            } label: {
-                Label(recorder.isPaused ? "Resume" : "Pause", systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
-            }
-            .buttonStyle(SecondaryButtonStyle())
+    // MARK: - Marks
 
-            Button {
-                markMotion()
-            } label: {
-                Label("Mark \(meeting.kind.markName)", systemImage: "bookmark.fill")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Theme.motion)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(Theme.motionSoft.opacity(flashMark ? 0.5 : 1), in: RoundedRectangle(cornerRadius: 14))
+    private var marks: some View {
+        VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+            SKCaption("Marked \(markName)s")
+            SKWell {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        Group {
+                            if meeting.motionMarks.isEmpty {
+                                Text(markHelp)
+                                    .sk1Hint()
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                FlowLayout(spacing: 6) {
+                                    ForEach(Array(meeting.motionMarks.enumerated()), id: \.offset) { index, mark in
+                                        SKChip("\(markName.uppercased()) \(index + 1) · \(mark.clock)", height: 24)
+                                            .accessibilityLabel(Text("\(markName) \(index + 1) marked at \(mark.clock)"))
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding(12)
+                        Color.clear.frame(height: 0).id(marksEnd)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .onChange(of: meeting.motionMarks.count) {
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(marksEnd, anchor: .bottom) }
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .disabled(!recorder.isRecording)
-
-            Button {
-                confirmingEnd = true
-            } label: {
-                Label("End", systemImage: "stop.fill")
-            }
-            .buttonStyle(PrimaryButtonStyle(tint: Theme.danger))
-            .frame(maxWidth: 110)
+            .frame(minHeight: 64, maxHeight: .infinity)
         }
     }
 
@@ -162,6 +178,48 @@ struct RecordingView: View {
         case .adHoc: return "Tap **Mark moment** when something important is decided or agreed. Those spots get extra attention in the summary."
         }
     }
+
+    // MARK: - Transport
+
+    private var transport: some View {
+        SKKeyTray(caption: "Transport") {
+            KeyRow(spacing: 3, weights: [1, 1.6, 1]) {
+                Button {
+                    recorder.isPaused ? recorder.resume() : recorder.pause()
+                } label: {
+                    KeyLabel(recorder.isPaused ? "Resume" : "Pause",
+                             systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
+                }
+                .buttonStyle(.sk1Key(.cream, size: .large))
+                .disabled(!recorder.isRecording)
+
+                Button {
+                    markMotion()
+                } label: {
+                    KeyLabel("Mark \(meeting.kind.markName)", systemImage: "bookmark.fill")
+                }
+                .buttonStyle(.sk1Key(.orange, size: .large))
+                .disabled(!recorder.isRecording)
+
+                Button {
+                    confirmingEnd = true
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "stop.fill").font(.system(size: 16, weight: .semibold))
+                        HStack(spacing: 5) {
+                            SKLamp(color: .red, lit: true, glow: 3, size: 6)
+                            Text("End").font(.system(size: 12, weight: .bold))
+                        }
+                    }
+                }
+                .buttonStyle(.sk1Key(.charcoal, size: .large))
+                .accessibilityLabel(Text("End meeting"))
+            }
+            .frame(height: SK1KeySize.large.height)
+        }
+    }
+
+    // MARK: - Actions
 
     private func begin() {
         guard !recorder.isRecording, meeting.status == .recording else { return }
@@ -187,8 +245,6 @@ struct RecordingView: View {
     private func markMotion() {
         meeting.motionMarks.append(recorder.elapsed)
         try? context.save()
-        withAnimation(.easeOut(duration: 0.15)) { flashMark = true }
-        withAnimation(.easeIn(duration: 0.3).delay(0.15)) { flashMark = false }
     }
 
     private func end() {
@@ -196,6 +252,115 @@ struct RecordingView: View {
         meeting.status = .processing
         try? context.save()
         router.showMeeting(meeting)
+    }
+}
+
+private extension MeetingKind {
+    /// The kind as the LCD shows it: "BOARD" or "AD-HOC".
+    var shortName: String {
+        switch self {
+        case .board: return "BOARD"
+        case .adHoc: return "AD-HOC"
+        }
+    }
+}
+
+/// A tall key's face: its symbol over its title.
+private struct KeyLabel: View {
+    let title: String
+    let systemImage: String
+
+    init(_ title: String, systemImage: String) {
+        self.title = title
+        self.systemImage = systemImage
+    }
+
+    var body: some View {
+        VStack(spacing: 3) {
+            Image(systemName: systemImage).font(.system(size: 16, weight: .semibold))
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .minimumScaleFactor(0.75)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+    }
+}
+
+/// Lays its subviews out in a row, sharing the width in proportion to `weights` (one per subview).
+private struct KeyRow: Layout {
+    var spacing: CGFloat
+    var weights: [CGFloat]
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let height = subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+        return CGSize(width: proposal.width ?? 320, height: proposal.height ?? height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let gaps = spacing * CGFloat(max(subviews.count - 1, 0))
+        let total = subviews.indices.reduce(CGFloat(0)) { $0 + weight($1) }
+        guard total > 0 else { return }
+        let unit = max(bounds.width - gaps, 0) / total
+        var x = bounds.minX
+        for index in subviews.indices {
+            let width = unit * weight(index)
+            subviews[index].place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                                  proposal: ProposedViewSize(width: width, height: bounds.height))
+            x += width + spacing
+        }
+    }
+
+    private func weight(_ index: Int) -> CGFloat { index < weights.count ? weights[index] : 1 }
+}
+
+/// Lays its subviews out left to right, starting a new line when the next one doesn't fit.
+private struct FlowLayout: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let width = rows.map(\.width).max() ?? 0
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), anchor: .topLeading, proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needed = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            if needed > width, !row.indices.isEmpty {
+                rows.append(row)
+                row = Row(indices: [index], width: size.width, height: size.height)
+            } else {
+                row.indices.append(index)
+                row.width = needed
+                row.height = max(row.height, size.height)
+            }
+        }
+        if !row.indices.isEmpty { rows.append(row) }
+        return rows
     }
 }
 

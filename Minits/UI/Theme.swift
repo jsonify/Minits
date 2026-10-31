@@ -1,38 +1,65 @@
+import SK1Tokens
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-/// Option A: clean and familiar. Navy accent, serif headings, soft gray ground.
+/// Temporary bridge to the SK-1 look (SK1Kit). The screens not yet moved to SK-1 (Home, RollCall, VoiceSampleSheet,
+/// Meeting, Review, Minutes) still use `Theme`, so every colour here maps to an SK-1 token and follows Dark Mode.
+/// Status colours (danger, success, warning) keep the token's hue but are darkened in light mode and lightened in
+/// Dark Mode until text in them reads at 4.5:1 or better on the chassis, a card and their own soft tint.
+/// Orange is not used: in SK-1 it means "on" or the main action, so `accent` is the ink.
+///
+/// Remove this file when the last screen moves to SK-1.
 enum Theme {
-    static let ground = Color(hex: 0xF5F7FA)
-    static let card = Color.white
-    static let ink = Color(hex: 0x15202B)
-    static let secondaryInk = Color(hex: 0x4A5868)
-    static let hairline = Color(hex: 0xE1E6EC)
-    static let border = Color(hex: 0xC9D3DE)
-    static let accent = Color(hex: 0x1F4E79)
-    static let accentSoft = Color(hex: 0xEAF1F8)
-    static let success = Color(hex: 0x1E6B3A)
-    static let successSoft = Color(hex: 0xE3F2E8)
-    static let danger = Color(hex: 0xB42318)
-    static let dangerSoft = Color(hex: 0xFDE8E7)
-    static let motion = Color(hex: 0x6B4E00)
-    static let motionSoft = Color(hex: 0xFFF4D6)
-    static let warning = Color(hex: 0x8A5300)
-    static let warningBorder = Color(hex: 0xC77700)
+    /// The chassis.
+    static let ground = Color(light: SK1.light.chassis, dark: SK1.dark.chassis)
+    /// A key's face: white-ish in light mode, the dark key's lower face in Dark Mode.
+    static let card = Color(light: SK1.light.keyTop, dark: SK1.dark.keyBottom)
+    static let ink = Color(light: SK1.light.ink, dark: SK1.dark.ink)
+    static let secondaryInk = Color(light: SK1.light.inkSoft, dark: SK1.dark.inkSoft)
+    static let hairline = Color(light: SK1.light.groove, dark: SK1.dark.groove)
+    static let border = Color(light: SK1.light.keySkirt, dark: SK1.dark.toggleOff)
+    static let accent = ink
+    static let accentSoft = Color(light: SK1.light.ink, dark: SK1.dark.ink, opacity: softOpacity)
+    /// What sits on an `accent` (or status-coloured) fill: the chassis colour.
+    static let onAccent = ground
+    /// `SK1.recRed`, for text.
+    static let danger = Color(light: 0xA83023, dark: 0xEF9A91)
+    static let dangerSoft = Color(light: 0xA83023, dark: 0xEF9A91, opacity: softOpacity)
+    /// `SK1.teal`, for text.
+    static let success = Color(light: 0x146858, dark: 0x6DC0B0)
+    static let successSoft = Color(light: 0x146858, dark: 0x6DC0B0, opacity: softOpacity)
+    /// `SK1.amber`, for text.
+    static let warning = Color(light: 0x845000, dark: 0xC8AE87)
+    static let warningBorder = Color(light: 0xC77700, dark: 0xD49A4A)
+    static let motion = warning
+    static let motionSoft = Color(light: 0x845000, dark: 0xC8AE87, opacity: softOpacity)
 
-    /// Background/foreground pairs for member avatars, chosen so each pair stays readable.
-    static let avatarColors: [(Color, Color)] = [
-        (Color(hex: 0xDCE8F5), Color(hex: 0x1F4E79)),
-        (Color(hex: 0xFCE6D4), Color(hex: 0x8A3E0B)),
-        (Color(hex: 0xE4DDF5), Color(hex: 0x4B2E83)),
-        (Color(hex: 0xDDF0E4), Color(hex: 0x1E6B3A)),
-        (Color(hex: 0xF8DDE6), Color(hex: 0x8C1D46)),
-        (Color(hex: 0xDDF0F2), Color(hex: 0x0E5A63)),
-        (Color(hex: 0xF3EBCF), Color(hex: 0x6B4E00)),
+    private static let softOpacity = 0.12
+
+    /// Background/foreground pairs for member avatars: light fills with dark text in light mode, muted dark fills
+    /// with the ink in Dark Mode (each 7.5:1 or better).
+    static let avatarColors: [(Color, Color)] = avatarHexes.map { lightFill, lightInk, darkFill in
+        (Color(light: lightFill, dark: darkFill), Color(light: lightInk, dark: SK1.dark.ink))
+    }
+    /// Light fill, light-mode ink, Dark Mode fill.
+    private static let avatarHexes: [(UInt32, UInt32, UInt32)] = [
+        (0xDCE8F5, 0x1F4E79, 0x243E54),
+        (0xFCE6D4, 0x8A3E0B, 0x5F3518),
+        (0xE4DDF5, 0x4B2E83, 0x3D2C5A),
+        (0xDDF0E4, 0x1E6B3A, 0x244E31),
+        (0xF8DDE6, 0x8C1D46, 0x602338),
+        (0xDDF0F2, 0x0E5A63, 0x1B4448),
+        (0xF3EBCF, 0x6B4E00, 0x4E3E12),
     ]
-    static let guestColors = (Color(hex: 0xE6ECF2), Color(hex: 0x4A5868))
+    static let guestColors = (Color(light: 0xE6ECF2, dark: SK1.dark.keyTop), Color(light: 0x4A5868, dark: SK1.dark.ink))
 
+    /// A heading in the system font (SK-1 has no serif type).
     static func heading(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .bold, design: .serif)
+        .system(size: size, weight: .bold)
     }
 }
 
@@ -43,6 +70,32 @@ extension Color {
             green: Double((hex >> 8) & 0xFF) / 255,
             blue: Double(hex & 0xFF) / 255)
     }
+
+    /// A colour that follows Dark Mode: `light` or `dark` (0xRRGGBB, sRGB), at `opacity`.
+    init(light: UInt32, dark: UInt32, opacity: Double = 1) {
+        #if os(iOS)
+        self.init(uiColor: UIColor { traits in
+            Self.platformColor(traits.userInterfaceStyle == .dark ? dark : light, opacity: opacity)
+        })
+        #elseif os(macOS)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return Self.platformColor(isDark ? dark : light, opacity: opacity)
+        })
+        #endif
+    }
+
+    #if os(iOS)
+    private static func platformColor(_ hex: UInt32, opacity: Double) -> UIColor {
+        UIColor(red: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255, alpha: CGFloat(opacity))
+    }
+    #elseif os(macOS)
+    private static func platformColor(_ hex: UInt32, opacity: Double) -> NSColor {
+        NSColor(srgbRed: CGFloat((hex >> 16) & 0xFF) / 255, green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255, alpha: CGFloat(opacity))
+    }
+    #endif
 }
 
 // MARK: - Shared pieces
@@ -69,7 +122,7 @@ struct PrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.onAccent)
             .frame(maxWidth: .infinity, minHeight: 56)
             .background(tint.opacity(configuration.isPressed ? 0.85 : 1), in: RoundedRectangle(cornerRadius: 16))
     }
@@ -113,7 +166,7 @@ extension View {
     }
 }
 
-/// Live level bars, used for voice samples and the recording screen.
+/// Live level bars, used for voice samples.
 struct LevelBars: View {
     let levels: [Float]
     var color: Color = Theme.accent
