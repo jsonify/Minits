@@ -47,7 +47,7 @@ struct MinutesView: View {
                     Task { await draft() }
                 } label: {
                     if working {
-                        HStack(spacing: 8) { ProgressView().tint(.white); Text(progressText.isEmpty ? "Working…" : progressText) }
+                        HStack(spacing: 8) { ProgressView().tint(Theme.onAccent); Text(progressText.isEmpty ? "Working…" : progressText) }
                     } else {
                         Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
                     }
@@ -104,7 +104,7 @@ struct MinutesView: View {
                 ShareLink(item: meeting.minutes ?? "", subject: Text(meeting.title)) {
                     Text("Share")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.onAccent)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14))
                 }
