@@ -1,7 +1,13 @@
+import SK1Tokens
+import SK1UI
 import SwiftData
 import SwiftUI
 
 /// Screen A3 ("Check who said what") and the full transcript, which share the same line cards.
+///
+/// SK-1 look: Review opens with an LCD (how many lines are left to check, in seven-segment digits); the transcript
+/// with a Motions only toggle and a Share key. Each line is a sunken tray: the speaker, the time on an LCD chip and a
+/// play key; a flagged line has an amber lamp and the reason, and its choices are keys, the current guess lit.
 struct ReviewView: View {
     @Environment(\.modelContext) private var context
     @Bindable var meeting: Meeting
@@ -53,28 +59,64 @@ struct ReviewView: View {
 
     @ViewBuilder private var intro: some View {
         if showAll {
-            HStack {
+            HStack(spacing: 12) {
                 Toggle("Motions only", isOn: $motionsOnly)
-                    .toggleStyle(.button)
+                    .toggleStyle(.sk1Square)
                     .disabled(meeting.motionMarks.isEmpty)
                 Spacer()
                 ShareLink(item: transcriptText, subject: Text(meeting.title)) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
+                .buttonStyle(.sk1Key(.cream))
             }
-            .font(.system(size: 14, weight: .semibold))
         } else {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(meeting.linesNeedingReview.isEmpty ? "All checked" : "Check who said what")
-                    .font(Theme.heading(28))
+            VStack(alignment: .leading, spacing: 10) {
+                reviewLCD
                 Text(meeting.linesNeedingReview.isEmpty
-                     ? "Every line has a speaker. Head to Minutes when you're ready."
-                     : "\(meeting.durationSeconds.clock) · \(meeting.lines.count) lines. Minits wasn't sure about \(meeting.linesNeedingReview.count). Tap play to listen, then pick who it was.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.secondaryInk)
+                     ? "Every line has a speaker. Head to \(meeting.kind.documentName) when you're ready."
+                     : "Minits wasn't sure who said these. Tap play to listen, then pick who it was.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.bottom, 4)
         }
+    }
+
+    private var reviewLCD: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let left = meeting.linesNeedingReview.count
+        return SKLCD {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(left == 0 ? "ALL CHECKED" : "CHECK WHO SAID WHAT")
+                        .font(.system(size: 15, weight: .bold, design: .monospaced))
+                        .tracking(1.5)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("\(meeting.durationSeconds.clock) · \(meeting.lines.count) LINES")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(0.8)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 3) {
+                    SKSevenSegment(String(format: "%02d", left), digitHeight: 30, spacing: 4)
+                        .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
+                        .opacity(left == 0 ? 0.4 : 1)
+                    Text("TO CHECK")
+                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .tracking(1)
+                }
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(left == 0
+            ? "All checked, \(meeting.lines.count) lines"
+            : "\(left) of \(meeting.lines.count) lines to check"))
     }
 
     private var visibleLines: [TranscriptLine] {
@@ -148,93 +190,93 @@ private struct LineCard: View {
     let choose: (Member) -> Void
     let confirm: () -> Void
     let nameGuest: () -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                if !expanded {
-                    Avatar(initials: initials, colorIndex: colorIndex, size: 32)
-                }
-                VStack(alignment: .leading, spacing: 2) {
+        let p = SK1.palette(for: scheme)
+        SKWell {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     if expanded {
-                        Text("\(line.reviewNote ?? "Unsure") · \(line.start.clock)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Theme.warning)
+                        HStack(spacing: 6) {
+                            SKLamp(color: .warning, lit: true, glow: 3, size: 7, label: "Needs a check")
+                            SKCaption(line.reviewNote ?? "Unsure")
+                        }
                     } else {
                         speakerMenu {
-                            HStack(spacing: 4) {
-                                Text(line.speakerName).font(.system(size: 13, weight: .bold))
-                                Text("· \(line.start.clock)").font(.system(size: 13)).foregroundStyle(Theme.secondaryInk)
+                            HStack(spacing: 8) {
+                                Avatar(initials: initials, colorIndex: colorIndex, size: 28)
+                                Text(line.speakerName)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Color(sk1Hex: p.ink))
+                                    .lineLimit(1)
                                 if line.needsReview {
-                                    Image(systemName: "questionmark.circle.fill").foregroundStyle(Theme.warningBorder)
+                                    SKLamp(color: .warning, lit: true, glow: 3, size: 7, label: "Needs a check")
                                 }
                             }
-                            .foregroundStyle(Theme.ink)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(Text("Speaker: \(line.speakerName)\(line.needsReview ? ", needs a check" : "")"))
+                        .accessibilityHint(Text("Change who said this"))
                     }
+                    Spacer(minLength: 8)
+                    SKChip(line.start.clock)
+                        .accessibilityLabel(Text("At \(line.start.clock)"))
+                    Button(action: play) {
+                        Image(systemName: isPlaying ? "stop.fill" : "play.fill")
+                    }
+                    .buttonStyle(.sk1Key(isOn: isPlaying))
+                    .accessibilityLabel(Text(isPlaying ? "Stop" : "Play this line"))
                 }
-                Spacer()
-                Button(action: play) {
-                    Image(systemName: isPlaying ? "stop.fill" : "play.fill")
-                        .font(.system(size: 14))
-                        .frame(width: 44, height: 44)
-                        .overlay(Circle().stroke(Theme.border))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(Theme.accent)
-                .accessibilityLabel(isPlaying ? "Stop" : "Play this line")
+
+                Text(line.text)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(sk1Hex: p.ink))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if expanded { choices }
             }
-
-            Text(line.text)
-                .font(.system(size: 16))
-                .foregroundStyle(Theme.ink)
-                .textSelection(.enabled)
-
-            if expanded { choices }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .card(highlighted: expanded ? Theme.warningBorder : nil)
     }
 
     private var choices: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Who said this?")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.secondaryInk)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            SKCaption("Who said this?", tone: .soft)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 if let current = member(line.speakerID) {
-                    choiceButton("\(current.name) ✓", selected: true) { confirm() }
+                    choiceKey("\(current.name) ✓", isOn: true) { confirm() }
+                        .accessibilityLabel(Text("Keep \(current.name)"))
                 } else {
-                    choiceButton("Name \(line.speakerName)…", selected: true) { nameGuest() }
+                    choiceKey("Name \(line.speakerName)…", isOn: true) { nameGuest() }
                 }
                 if let alternate = member(line.alternateSpeakerID), alternate.id != line.speakerID {
-                    choiceButton(alternate.name, selected: false) { choose(alternate) }
+                    choiceKey(alternate.name, isOn: false) { choose(alternate) }
                 }
                 speakerMenu {
                     Text("Someone else…")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
+                .buttonStyle(.sk1Key(.cream, size: .large))
             }
         }
     }
 
-    private func choiceButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    /// One answer as a key; the current guess is lit with the orange bar.
+    private func choiceKey(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(selected ? Theme.accentSoft : Theme.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected ? Theme.accent : Theme.border, lineWidth: selected ? 2 : 1))
+                .minimumScaleFactor(0.7)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.sk1Key(.cream, isOn: isOn, size: .large))
     }
 
+    /// The members to pick from, a way to name someone else, and (on a flagged line) keeping the guess. Give it a
+    /// button style.
     private func speakerMenu<MenuLabel: View>(@ViewBuilder label: () -> MenuLabel) -> some View {
         Menu {
             ForEach(members) { member in
@@ -249,7 +291,6 @@ private struct LineCard: View {
             label()
         }
         .menuStyle(.button)
-        .buttonStyle(.plain)
         .menuIndicator(.hidden)
     }
 
