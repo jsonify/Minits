@@ -5,21 +5,23 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 ## How it works
 
 1. **Pick the kind of meeting on Home.** Two cream keys under START A MEETING: *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. Each shows what you get and an example line. The one you used last is lit with SK-1's orange bar. Tapping a key opens roll call with that kind selected; you can still switch it there.
-2. **Voice roll call.** Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. The voice sample sheet works like the recording screen: an LCD with a status lamp, the member's name and role, the elapsed time and the input level, the line to read in a tray, and the orange **Record** key. **Stop** (charcoal, red lamp) works after 4 seconds and stops on its own at 15. If the new voice sounds a lot like another member's, an amber lamp says so. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
+2. **Voice roll call.** Roll call shows an LCD with how many are here and how many of them have a voice saved, then the members as rows in one tray: tap a row to mark someone here or not (an indicator square shows which), touch and hold to re-record or remove. A teal lamp means the voice is saved; otherwise the row has a **Record** key. **Add member or guest** opens a sheet with LCD text fields for the name and an optional role; once added, their voice sample starts. The meeting name is an LCD text field too, and the orange **Start meeting** key sits at the bottom. Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. The voice sample sheet works like the recording screen: an LCD with a status lamp, the member's name and role, the elapsed time and the input level, the line to read in a tray, and the orange **Record** key. **Stop** (charcoal, red lamp) works after 4 seconds and stops on its own at 15. If the new voice sounds a lot like another member's, an amber lamp says so. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
 3. **Record.** One tap. Keeps recording with the screen locked. The recording screen has one big LCD: a red REC lamp that blinks while recording ("PAUSED" when paused), the kind of meeting and how many are here, the elapsed time in seven-segment digits and the input level. Under it, three keys: **Pause/Resume**, the orange **Mark motion** key (board meeting: tap it when someone makes a motion or the board votes) or **Mark moment** (ad-hoc meeting: tap it when something is decided), and the charcoal **End** key with a red lamp, which asks before it stops. Each mark shows as a chip such as `MOTION 1 · 12:04` in the tray above the keys. If a call or another app interrupts, the recording pauses and an amber lamp says so; tap Resume to keep going.
 4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English). While it works, an LCD shows a blinking WORKING lamp, the current step, how far along it is as a percentage and a bar of cells. If it fails, a red lamp shows the error and the orange **Try again** key starts over; the recording is kept. When it's done, a segmented control switches between **Review** (with how many lines need a look, e.g. `REVIEW · 3`), **Transcript** and **Minutes** or **Summary**.
-5. **Review.** Lines the app isn't sure about are flagged. Play the line, tap the right name. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines.
+5. **Review.** Lines the app isn't sure about are flagged. An LCD shows how many are left to check. Each line is a tray with the speaker, its time on an LCD chip and a play key; a flagged line has an amber lamp with the reason and its choices as keys, the current guess lit with the orange bar. Play the line, tap the right name, or **Someone else…** for the full list. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines. The Transcript tab shows every line, with a **Motions only** toggle and a **Share** key.
 6. **Minutes or summary.** On iOS 26 / macOS 26 with Apple Intelligence, the write-up is drafted on-device:
    - *Board meeting:* formal minutes (attendance, discussion, motions with mover/seconder/vote, action items).
    - *Ad-hoc meeting:* a summary (what it was about, topics discussed, decisions, action items, open questions).
 
    Without Apple Intelligence you get an outline built from the transcript instead: likely decisions and action items pulled out by phrases like "agreed" or "I'll", each marked spot quoted, and (for ad-hoc meetings) the full transcript.
 
+   The orange key drafts it, with an LCD readout of what it's doing; lines still to check get an amber note first. The draft is editable in a tray under a teal DRAFT lamp, with **Redraft** (asks first), **Copy** and the orange **Share** key. If drafting fails you get the outline, with the error shown above it.
+
 The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline.
 
 ## Look
 
-Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.2.0 or later). It follows the system's Light or Dark Mode. The Home, recording, voice sample and meeting (processing and tabs) screens are built from SK1Kit's components; roll call, Review and the minutes are moving over one at a time and meanwhile use `UI/Theme.swift`, a temporary bridge that maps their colours to SK-1 tokens.
+Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.3.0 or later). It follows the system's Light or Dark Mode. Every screen is built from SK1Kit's components. The only colours of Minits' own are the member avatars (SK-1 has none for people), in `UI/Shared.swift`.
 
 ## Build it (Mac, free Apple ID is fine)
 
@@ -56,7 +58,7 @@ Minits/
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
   UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
-  UI/Theme.swift            Temporary bridge from the old colours to SK-1 tokens, removed once every screen uses SK1Kit
+  UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
@@ -72,7 +74,7 @@ xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'
 xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
 ```
 
-CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme for the iOS Simulator and for macOS without signing, runs `MinitsEvalTests`, and lists compiler warnings in `Minits/UI` and `MinitsApp.swift` in the run summary (it fails on warnings in the files already on SK-1). It doesn't run `MinitsTests`, which needs the models.
+CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme for the iOS Simulator and for macOS without signing, runs `MinitsEvalTests`, and lists compiler warnings in `Minits/UI` and `MinitsApp.swift` in the run summary (any warning there fails the run). It doesn't run `MinitsTests`, which needs the models.
 
 `MinitsTests` downloads FluidAudio's models on first run and needs a Mac with a Neural Engine (Apple Silicon) — the ASR model crashes on Intel Macs.
 
