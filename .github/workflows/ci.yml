@@ -15,6 +15,10 @@ jobs:
     name: Build and test (macOS)
     runs-on: macos-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        # An explicit bash shell runs with -o pipefail, so a failing xcodebuild fails its step despite the `| tee`.
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
