@@ -46,7 +46,7 @@ struct RecordingView: View {
         .navigationTitle("")
         .inlineTitle()
         .navigationBarBackButtonHiddenCompat()
-        .task { begin() }
+        .task { await begin() }
         .onDisappear {
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false
@@ -185,7 +185,11 @@ struct RecordingView: View {
         SKKeyTray(caption: "Transport") {
             KeyRow(spacing: 3, weights: [1, 1.6, 1]) {
                 Button {
-                    recorder.isPaused ? recorder.resume() : recorder.pause()
+                    if recorder.isPaused {
+                        Task { await recorder.resume() }
+                    } else {
+                        recorder.pause()
+                    }
                 } label: {
                     KeyLabel(recorder.isPaused ? "Resume" : "Pause",
                              systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
@@ -221,7 +225,7 @@ struct RecordingView: View {
 
     // MARK: - Actions
 
-    private func begin() {
+    private func begin() async {
         guard !recorder.isRecording, meeting.status == .recording else { return }
         // Reopened after the app was closed mid-meeting: keep what was recorded and process it.
         if let size = try? FileManager.default.attributesOfItem(atPath: meeting.audioURL.path)[.size] as? Int,
@@ -233,7 +237,7 @@ struct RecordingView: View {
             return
         }
         do {
-            try recorder.start(to: meeting.audioURL)
+            try await recorder.start(to: meeting.audioURL)
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = true
             #endif

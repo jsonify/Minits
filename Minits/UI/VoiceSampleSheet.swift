@@ -21,6 +21,8 @@ struct VoiceSampleSheet: View {
     @State private var phase: Phase = .ready
     @State private var sampleURL: URL?
     @State private var lookAlike: String?
+    /// Set while asking for the mic and starting the recorder, so a second tap can't start a second recording.
+    @State private var starting = false
 
     private let targetSeconds: TimeInterval = 10
     private let maxSeconds: TimeInterval = 15
@@ -207,6 +209,7 @@ struct VoiceSampleSheet: View {
                         .minimumScaleFactor(0.7)
                 }
                 .buttonStyle(.sk1Key(.orange, size: .large))
+                .disabled(starting)
             case .recording:
                 Button {
                     Task { await finish() }
@@ -237,13 +240,16 @@ struct VoiceSampleSheet: View {
     }
 
     private func start() async {
+        guard !starting else { return }
+        starting = true
+        defer { starting = false }
         guard await AudioRecorder.requestPermission() else {
             phase = .failed("Minits can't use the microphone. Turn it on in Settings › Privacy › Microphone.")
             return
         }
         let url = Storage.temporaryRecordingURL()
         do {
-            try recorder.start(to: url)
+            try await recorder.start(to: url)
             sampleURL = url
             phase = .recording
         } catch {

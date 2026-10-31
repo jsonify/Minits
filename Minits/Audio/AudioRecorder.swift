@@ -18,6 +18,8 @@ final class AudioRecorder: NSObject {
 
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
+    /// The last `stop()`'s session deactivation, which `start` waits for so it can't land after a new activation.
+    private var deactivation: Task<Void, Never>?
 
     static let settings: [String: Any] = [
         AVFormatIDKey: kAudioFormatLinearPCM,
@@ -44,16 +46,16 @@ final class AudioRecorder: NSObject {
 
     // MARK: Control
 
-    func start(to url: URL) throws {
+    /// Activating the audio session can block for a moment, so it happens off the main thread
+    /// (AVAudioSession warns that doing it on the main thread can make the UI unresponsive).
+    func start(to url: URL) async throws {
         #if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        // .record + .default mode: no voice processing, so voices across the table aren't filtered out.
-        // Wired/USB conference mics are picked up automatically when plugged in.
-        try session.setCategory(.record, mode: .default)
-        try session.setActive(true)
+        await deactivation?.value
+        deactivation = nil
+        try await Self.activateSession()
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleInterruption(_:)),
-            name: AVAudioSession.interruptionNotification, object: session)
+            name: AVAudioSession.interruptionNotification, object: AVAudioSession.sharedInstance())
         #endif
 
         let recorder = try AVAudioRecorder(url: url, settings: Self.settings)
@@ -73,9 +75,10 @@ final class AudioRecorder: NSObject {
         isPaused = true
     }
 
-    func resume() {
+    func resume() async {
         #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(true)
+        // After an interruption the session may have been deactivated by the system.
+        try? await Self.activateSession()
         #endif
         recorder?.record()
         isPaused = false
@@ -95,10 +98,24 @@ final class AudioRecorder: NSObject {
         level = 0
         #if os(iOS)
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        deactivation = Task.detached(priority: .userInitiated) {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         #endif
         return max(duration, elapsed)
     }
+
+    #if os(iOS)
+    /// .record + .default mode: no voice processing, so voices across the table aren't filtered out.
+    /// Wired/USB conference mics are picked up automatically when plugged in.
+    private nonisolated static func activateSession() async throws {
+        try await Task.detached(priority: .userInitiated) {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .default)
+            try session.setActive(true)
+        }.value
+    }
+    #endif
 
     // MARK: Metering
 
