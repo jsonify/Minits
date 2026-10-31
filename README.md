@@ -43,7 +43,7 @@ In Xcode:
    - First time: on the iPhone, turn on **Settings › Privacy & Security › Developer Mode**, then trust your profile in **Settings › General › VPN & Device Management**.
    - With a free Apple ID the iPhone app stops opening after **7 days**. Plug in and press ⌘R again to renew it; your saved voices and meetings stay.
 
-**After every `git pull`, run `xcodegen` again** if `project.yml` changed. `Minits.xcodeproj` is generated, not committed, so an old copy doesn't know about new packages. The build then fails with *Unable to resolve module dependency: 'SK1Tokens'*, or, after a file was removed or added, *Build input file cannot be found: '…/Minits/UI/Theme.swift'*. Xcode fetches the Swift packages (FluidAudio, SK1Kit) on the first build after that; if it still can't resolve them, use **File › Packages › Reset Package Caches**.
+**After every `git pull`, run `xcodegen` again** if `project.yml` changed. `Minits.xcodeproj` is generated, not committed, so an old copy doesn't know about new packages. The build then fails with *Unable to resolve module dependency: 'SK1Tokens'*, or, after a file was removed or added, *Build input file cannot be found: '…/Minits/UI/Theme.swift'*. Xcode fetches the Swift packages (FluidAudio, SK1Kit) on the first build after that. When `project.yml` raises a package's version and Xcode keeps the old one (for example *Cannot find 'SKTextField' in scope* while SK1Kit still shows 0.2.0 under Package Dependencies), use **File › Packages › Update to Latest Package Versions**; if it still can't resolve them, use **File › Packages › Reset Package Caches**.
 
 ## Project layout
 
