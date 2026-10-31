@@ -6,8 +6,8 @@ import UIKit
 import AppKit
 #endif
 
-/// Temporary bridge to the SK-1 look (SK1Kit). The screens not yet moved to SK-1 (Home, RollCall, VoiceSampleSheet,
-/// Meeting, Review, Minutes) still use `Theme`, so every colour here maps to an SK-1 token and follows Dark Mode.
+/// Temporary bridge to the SK-1 look (SK1Kit). The screens not yet moved to SK-1 (RollCall, Review, Minutes) still use
+/// `Theme`, so every colour here maps to an SK-1 token and follows Dark Mode.
 /// Status colours (danger, success, warning) keep the token's hue but are darkened in light mode and lightened in
 /// Dark Mode until text in them reads at 4.5:1 or better on the chassis, a card and their own soft tint.
 /// Orange is not used: in SK-1 it means "on" or the main action, so `accent` is the ink.
@@ -163,25 +163,5 @@ extension View {
         #else
         return self
         #endif
-    }
-}
-
-/// Live level bars, used for voice samples.
-struct LevelBars: View {
-    let levels: [Float]
-    var color: Color = Theme.accent
-    var height: CGFloat = 36
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 3) {
-            ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
-                Capsule()
-                    .fill(level > 0.02 ? color : Theme.border)
-                    .frame(width: 4, height: max(5, CGFloat(level) * height))
-            }
-        }
-        .frame(height: height)
-        .animation(.linear(duration: 0.1), value: levels)
-        .accessibilityHidden(true)
     }
 }
