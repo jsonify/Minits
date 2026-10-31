@@ -19,7 +19,6 @@ struct MinitsApp: App {
             }
             .environment(router)
             .tint(Theme.accent)
-            .preferredColorScheme(.light)
             #if os(macOS)
             .frame(minWidth: 420, idealWidth: 480, minHeight: 640, idealHeight: 820)
             #endif

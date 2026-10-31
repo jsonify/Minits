@@ -86,7 +86,7 @@ struct MinutesView: View {
             TextEditor(text: Binding(
                 get: { meeting.minutes ?? "" },
                 set: { meeting.minutes = $0 }))
-                .font(.system(size: 16, design: .serif))
+                .font(.system(size: 16))
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
