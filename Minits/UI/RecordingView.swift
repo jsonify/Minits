@@ -14,6 +14,7 @@ import UIKit
 struct RecordingView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
+    @Environment(\.runsMeetingWork) private var runsMeetingWork
     @Query(sort: \Member.sortOrder) private var members: [Member]
     let meeting: Meeting
 
@@ -46,7 +47,10 @@ struct RecordingView: View {
         .navigationTitle("")
         .inlineTitle()
         .navigationBarBackButtonHiddenCompat()
-        .task { await begin() }
+        .task {
+            guard runsMeetingWork else { return }
+            await begin()
+        }
         .onDisappear {
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false

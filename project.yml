@@ -98,6 +98,22 @@ targets:
         SWIFT_VERSION: "5.0"
         PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.tests
 
+  # Screenshots of every screen in light and dark at iPhone and wide widths (Tests/MinitsScreenTests). Runs inside
+  # the app on the iOS Simulator (UIKit draws the text fields and scroll views that ImageRenderer can't); no models
+  # or mic needed: xcodebuild test -scheme MinitsScreenTests -destination 'platform=iOS Simulator,name=iPhone 16'
+  MinitsScreenTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/MinitsScreenTests
+    dependencies:
+      - target: Minits
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits.screentests
+
   # Command-line speaker eval: `minits-eval run eval/`, `label <session>`, `compare a.json b.json`.
   # Compiles VoiceEngine.swift and Minits/Eval directly, so the engine stays single-sourced with the app:
   # xcodebuild -scheme minits-eval build
