@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        # An explicit bash shell runs with -o pipefail, so a failing xcodebuild fails its step despite the `| tee`.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: xcodebuild -version
+
+      - name: Generate the project
+        run: |
+          brew install xcodegen
+          xcodegen
+
+      - name: Build the app for iOS
+        run: |
+          xcodebuild build -project Minits.xcodeproj -scheme Minits \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build-ios.log
+
+      - name: Build the app for macOS
+        run: |
+          xcodebuild build -project Minits.xcodeproj -scheme Minits \
+            -destination 'generic/platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=- 2>&1 | tee build-macos.log
+
+      # MinitsTests is not run here: its VoiceEngine snapshot test downloads FluidAudio's models (a few hundred MB)
+      # and needs an Apple Silicon Neural Engine, so run it on a Mac by hand (see README.md).
+      - name: Test the eval scorer (MinitsEvalTests)
+        run: |
+          xcodebuild test -project Minits.xcodeproj -scheme MinitsEvalTests \
+            -destination 'platform=macOS' 2>&1 | tee test-eval.log
+
+      - name: Report warnings in the app's UI
+        if: always()
+        run: |
+          touch build-ios.log build-macos.log
+          grep -hE '/Minits/(UI/[^:]+|MinitsApp)\.swift:[0-9]+:[0-9]+: warning:' build-ios.log build-macos.log \
+            | sed -E 's#^.*/Minits/Minits/#Minits/#' | sort -u > ui-warnings.txt || true
+          count=$(wc -l < ui-warnings.txt | tr -d ' ')
+          {
+            echo "### Warnings in Minits/UI and MinitsApp.swift: $count"
+            if [ "$count" -gt 0 ]; then
+              echo '```'
+              cat ui-warnings.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat ui-warnings.txt
+          # Files already on SK-1 (or the bridge to it) must stay warning-free; the older screens are reported only.
+          if grep -qE '^Minits/(UI/(RecordingView|Theme)|MinitsApp)\.swift:' ui-warnings.txt; then
+            echo "::error::Warnings in RecordingView.swift, Theme.swift or MinitsApp.swift"
+            exit 1
+          fi
