@@ -46,14 +46,14 @@ struct RecordingView: View {
         .navigationTitle("")
         .inlineTitle()
         .navigationBarBackButtonHiddenCompat()
-        .task { begin() }
+        .task { await begin() }
         .onDisappear {
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false
             #endif
         }
         .confirmationDialog("End the meeting?", isPresented: $confirmingEnd, titleVisibility: .visible) {
-            Button("End and make the transcript") { end() }
+            Button("End and make the transcript") { Task { await end() } }
             Button("Keep recording", role: .cancel) {}
         } message: {
             Text("Minits will stop recording and start working out who said what.")
@@ -185,7 +185,9 @@ struct RecordingView: View {
         SKKeyTray(caption: "Transport") {
             KeyRow(spacing: 3, weights: [1, 1.6, 1]) {
                 Button {
-                    recorder.isPaused ? recorder.resume() : recorder.pause()
+                    Task {
+                        if recorder.isPaused { await recorder.resume() } else { await recorder.pause() }
+                    }
                 } label: {
                     KeyLabel(recorder.isPaused ? "Resume" : "Pause",
                              systemImage: recorder.isPaused ? "play.fill" : "pause.fill")
@@ -221,7 +223,7 @@ struct RecordingView: View {
 
     // MARK: - Actions
 
-    private func begin() {
+    private func begin() async {
         guard !recorder.isRecording, meeting.status == .recording else { return }
         // Reopened after the app was closed mid-meeting: keep what was recorded and process it.
         if let size = try? FileManager.default.attributesOfItem(atPath: meeting.audioURL.path)[.size] as? Int,
@@ -233,7 +235,7 @@ struct RecordingView: View {
             return
         }
         do {
-            try recorder.start(to: meeting.audioURL)
+            try await recorder.start(to: meeting.audioURL)
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = true
             #endif
@@ -247,8 +249,8 @@ struct RecordingView: View {
         try? context.save()
     }
 
-    private func end() {
-        meeting.durationSeconds = recorder.stop()
+    private func end() async {
+        meeting.durationSeconds = await recorder.stop()
         meeting.status = .processing
         try? context.save()
         router.showMeeting(meeting)

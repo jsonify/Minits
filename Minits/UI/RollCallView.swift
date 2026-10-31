@@ -1,10 +1,17 @@
+import SK1Tokens
+import SK1UI
 import SwiftData
 import SwiftUI
 
 /// Screen A1: pick the kind of meeting, learn each member's voice, pick who's here, start the meeting.
+///
+/// SK-1 look: the kind as a segmented control, an LCD header (how many are here and how many voices are saved), the
+/// members as rows in one sunken tray (tap a row to mark them here or not; a teal lamp for a saved voice or a Record
+/// key), the meeting name in an LCD text field, and the orange Start meeting key at the bottom.
 struct RollCallView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Query(sort: \Member.sortOrder) private var members: [Member]
 
     @State private var absent: Set<UUID> = []
@@ -19,81 +26,48 @@ struct RollCallView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Picker("Kind of meeting", selection: $kind) {
-                        ForEach(MeetingKind.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    SKSegmented(selection: $kind, options: MeetingKind.allCases.map { SKSegmented<MeetingKind>.Option($0, $0.label) },
+                                caption: "Kind")
                     Text(kind == .board
                          ? "Formal minutes afterwards: attendance, motions, votes, action items."
                          : "A summary afterwards: what was discussed, decisions, action items.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Theme.secondaryInk)
+                        .sk1Hint()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Voice roll call")
-                        .font(Theme.heading(32))
-                    Text(kind == .board
-                         ? "Pass the phone, or tap Record next to a name. Each member says their name and role in one sentence so Minits learns their voice. Voices are saved for next time."
-                         : "Optional. Record a voice for anyone you want named in the transcript; everyone else shows up as Guest 1, Guest 2… Voices are saved for next time.")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.secondaryInk)
-                }
+                header
 
-                VStack(spacing: 10) {
-                    ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
-                        MemberRow(
-                            member: member,
-                            colorIndex: index,
-                            isHere: !absent.contains(member.id),
-                            toggleHere: { toggle(member) },
-                            record: { sampling = member })
-                        .contextMenu {
-                            Button("Re-record voice") { sampling = member }
-                            Button("Remove member", role: .destructive) { remove(member) }
-                        }
-                    }
+                Text(kind == .board
+                     ? "Pass the phone, or tap Record next to a name. Each member says their name and role in one sentence so Minits learns their voice. Voices are saved for next time."
+                     : "Optional. Record a voice for anyone you want named in the transcript; everyone else shows up as Guest 1, Guest 2… Voices are saved for next time.")
+                    .sk1Hint()
+                    .fixedSize(horizontal: false, vertical: true)
 
-                    Button {
-                        addingMember = true
-                    } label: {
-                        Label("Add member or guest", systemImage: "plus")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .strokeBorder(Theme.border, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.accent)
-                }
+                memberTray
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Meeting name")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.secondaryInk)
-                    TextField("Meeting name", text: Binding(
+                VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+                    SKCaption("Meeting name")
+                    SKTextField("Meeting name", text: Binding(
                         get: { meetingTitle },
                         set: { meetingTitle = $0; titleEdited = true }))
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 16))
-                        .card()
                 }
 
                 if micDenied {
-                    Text("Minits can't use the microphone. Turn it on in Settings › Privacy › Microphone.")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.danger)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        SKLamp(color: .danger, lit: true, label: "Error")
+                        Text("Minits can't use the microphone. Turn it on in Settings › Privacy › Microphone.")
+                            .sk1Hint()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
             .padding(20)
             .frame(maxWidth: 640)
             .frame(maxWidth: .infinity)
         }
-        .background(Theme.ground)
+        .sk1Chassis()
         .onAppear { applyDefaults(for: kind) }
         .onChange(of: kind) { _, kind in applyDefaults(for: kind) }
         .safeAreaInset(edge: .bottom) { footer }
@@ -118,31 +92,115 @@ struct RollCallView: View {
         }
     }
 
-    private var presentWithVoice: [Member] {
-        members.filter { $0.hasVoice && !absent.contains($0.id) }
+    private var palette: SK1.Palette { SK1.palette(for: scheme) }
+
+    private var present: [Member] { members.filter { !absent.contains($0.id) } }
+
+    private var presentWithVoice: [Member] { present.filter(\.hasVoice) }
+
+    // MARK: - Header
+
+    private var header: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let voices = presentWithVoice.count
+        return SKLCD {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("ROLL CALL")
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                        .tracking(2)
+                        .lineLimit(1)
+                    Text(members.isEmpty ? "NO MEMBERS YET" : "\(voices) OF \(present.count) HERE HAVE A VOICE")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(0.8)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 3) {
+                    SKSevenSegment(String(format: "%02d", present.count), digitHeight: 30, spacing: 4)
+                        .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
+                        .opacity(present.isEmpty ? 0.4 : 1)
+                    Text("HERE")
+                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .tracking(1)
+                }
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Roll call, \(present.count) here, \(voices) with a saved voice"))
     }
+
+    // MARK: - Members
+
+    private var memberTray: some View {
+        VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+            SKCaption("Members")
+            if !members.isEmpty {
+                SKWell {
+                    VStack(spacing: 0) {
+                        ForEach(Array(members.enumerated()), id: \.element.id) { index, member in
+                            if index > 0 { SKGroove() }
+                            MemberRow(
+                                member: member,
+                                colorIndex: index,
+                                isHere: !absent.contains(member.id),
+                                toggleHere: { toggle(member) },
+                                record: { sampling = member })
+                            .contextMenu {
+                                Button("Re-record voice") { sampling = member }
+                                Button("Remove member", role: .destructive) { remove(member) }
+                            }
+                        }
+                    }
+                }
+            }
+            Button {
+                addingMember = true
+            } label: {
+                Label("Add member or guest", systemImage: "plus")
+            }
+            .buttonStyle(.sk1Key(.cream))
+            Text("Tap a name to mark them here or not. Touch and hold for more.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    // MARK: - Footer
 
     private var footer: some View {
         VStack(spacing: 10) {
-            Label("Voices and audio stay on this device", systemImage: "lock")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.secondaryInk)
-            Button("Start meeting") {
+            Button {
                 Task { await startMeeting() }
+            } label: {
+                Label("Start meeting", systemImage: "record.circle")
             }
-            .buttonStyle(PrimaryButtonStyle())
+            .buttonStyle(.sk1Key(.orange, size: .large))
             if presentWithVoice.isEmpty, kind == .board {
                 Text("You can start without voice samples, but everyone will show up as Guest 1, Guest 2…")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .sk1Hint()
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Label("Voices and audio stay on this device", systemImage: "lock")
+                .sk1Hint()
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity)
-        .background(Theme.ground)
+        .background(alignment: .top) {
+            ZStack(alignment: .top) {
+                Color(sk1Hex: palette.chassis)
+                SKGroove()
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     /// Board meetings start with every member here; ad-hoc meetings start with nobody, so saved
@@ -190,74 +248,105 @@ private struct MemberRow: View {
     let isHere: Bool
     let toggleHere: () -> Void
     let record: () -> Void
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let p = SK1.palette(for: scheme)
         HStack(spacing: 12) {
             Button(action: toggleHere) {
                 HStack(spacing: 12) {
-                    Avatar(initials: member.initials, colorIndex: colorIndex)
-                    VStack(alignment: .leading, spacing: 2) {
+                    Avatar(initials: member.initials, colorIndex: colorIndex, size: 36)
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(member.name)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.ink)
-                        Text(isHere ? (member.role.isEmpty ? "Here" : member.role) : "Not here today")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Theme.secondaryInk)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(sk1Hex: p.ink))
+                            .lineLimit(1)
+                        SKIndicator(isHere ? (member.role.isEmpty ? "Here" : "Here · \(member.role)") : "Not here today",
+                                    isOn: isHere)
                     }
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(member.name), \(isHere ? "here" : "not here")")
-            .accessibilityHint("Toggles whether they're at this meeting")
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("\(member.name)\(member.role.isEmpty ? "" : ", \(member.role)"), \(isHere ? "here" : "not here")"))
+            .accessibilityHint(Text("Toggles whether they're at this meeting"))
 
             if member.hasVoice {
-                Label("Voice saved", systemImage: "checkmark")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.success)
+                HStack(spacing: 6) {
+                    SKLamp(color: .success, lit: true, glow: 3, size: 7)
+                    Text("Voice")
+                        .font(.sk1(SK1.TypeScale.indicator))
+                        .tracking(SK1.TypeScale.indicator.kern)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Color(sk1Hex: p.ink))
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Voice saved"))
             } else {
-                Button("Record", action: record)
-                    .font(.system(size: 14, weight: .semibold))
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 44)
-                    .overlay(Capsule().stroke(Theme.accent))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.accent)
+                Button(action: record) {
+                    Label("Record", systemImage: "mic.fill")
+                }
+                .buttonStyle(.sk1Key(.cream))
+                .accessibilityLabel(Text("Record \(member.name)'s voice"))
             }
         }
-        .card()
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(minHeight: 60)
         .opacity(isHere ? 1 : 0.5)
     }
 }
 
+/// Adds a member or guest: a name and an optional role, each in an LCD text field.
 struct AddMemberSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var role = ""
     let onAdd: (String, String) -> Void
 
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Name", text: $name)
-                TextField("Role (Chair, Treasurer, Member…)", text: $role)
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+                    SKCaption("Name")
+                    SKTextField("Name", text: $name)
+                        .onSubmit(add)
+                }
+                VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+                    SKCaption("Role")
+                    SKTextField("Role", text: $role, prompt: "Chair, Treasurer, Member…")
+                        .onSubmit(add)
+                    Text("Optional. It's used in the minutes and in the line each member reads.")
+                        .sk1Hint()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .sk1Chassis()
             .navigationTitle("Add member")
             .inlineTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") {
-                        onAdd(name.trimmingCharacters(in: .whitespaces), role.trimmingCharacters(in: .whitespaces))
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Add", action: add)
+                        .disabled(trimmedName.isEmpty)
                 }
             }
         }
         #if os(macOS)
-        .frame(minWidth: 360, minHeight: 200)
+        .frame(minWidth: 360, minHeight: 260)
         #endif
+    }
+
+    private func add() {
+        guard !trimmedName.isEmpty else { return }
+        onAdd(trimmedName, role.trimmingCharacters(in: .whitespaces))
+        dismiss()
     }
 }

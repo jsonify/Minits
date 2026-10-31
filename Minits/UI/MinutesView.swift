@@ -1,3 +1,5 @@
+import SK1Tokens
+import SK1UI
 import SwiftData
 import SwiftUI
 #if os(iOS)
@@ -7,8 +9,13 @@ import AppKit
 #endif
 
 /// Screen A4: the drafted minutes (board meeting) or summary (ad-hoc meeting), editable and shareable.
+///
+/// SK-1 look: before a draft, what will happen, any lines still to check (amber lamp) and the orange key that drafts
+/// it, with an LCD readout while it works. After, a teal DRAFT lamp and a Redraft key, the text in a sunken tray, and
+/// the Copy and orange Share keys.
 struct MinutesView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Bindable var meeting: Meeting
     let members: [Member]
 
@@ -27,36 +34,50 @@ struct MinutesView: View {
         }
     }
 
+    private var palette: SK1.Palette { SK1.palette(for: scheme) }
+
     private var startView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(meeting.kind == .board ? "Draft the minutes" : "Write a summary")
-                    .font(Theme.heading(28))
+            VStack(alignment: .leading, spacing: 14) {
+                SKCaption(meeting.kind == .board ? "Draft the minutes" : "Write a summary")
                 Text(MinutesWriter.aiAvailable ? aiDescription : MinutesWriter.aiUnavailableReason)
                     .font(.system(size: 15))
-                    .foregroundStyle(Theme.secondaryInk)
+                    .foregroundStyle(Color(sk1Hex: palette.ink))
+                    .fixedSize(horizontal: false, vertical: true)
                 if !meeting.linesNeedingReview.isEmpty {
-                    Label("\(meeting.linesNeedingReview.count) lines still need a speaker check. You can draft now and fix names later.", systemImage: "exclamationmark.triangle")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Theme.warning)
+                    note(.warning, "To check",
+                         "\(meeting.linesNeedingReview.count) lines still need a speaker check. You can draft now and fix names later.")
                 }
                 if let errorText {
-                    Text(errorText).font(.system(size: 14)).foregroundStyle(Theme.danger)
+                    note(.danger, "Error", errorText)
+                }
+                if working {
+                    SKReadout(progressText.isEmpty ? "WORKING…" : progressText.uppercased())
                 }
                 Button {
                     Task { await draft() }
                 } label: {
-                    if working {
-                        HStack(spacing: 8) { ProgressView().tint(Theme.onAccent); Text(progressText.isEmpty ? "Working…" : progressText) }
-                    } else {
-                        Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
-                    }
+                    Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(.sk1Key(.orange, size: .large))
                 .disabled(working)
             }
             .padding(20)
         }
+    }
+
+    /// A lamp and caption with a sentence under them.
+    private func note(_ color: SKLampColor, _ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                SKLamp(color: color, lit: true, label: title)
+                SKCaption(title)
+            }
+            Text(text)
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var aiDescription: String {
@@ -69,46 +90,46 @@ struct MinutesView: View {
     }
 
     private var editorView: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Draft · edit anything")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.success)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Theme.successSoft, in: Capsule())
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                SKLamp(color: .success, lit: true, label: "Draft")
+                SKCaption("Draft · edit anything")
                 Spacer()
                 Button("Redraft") { confirmingRedo = true }
-                    .font(.system(size: 14, weight: .semibold))
+                    .buttonStyle(.sk1Key(.cream))
                     .disabled(working)
             }
 
-            TextEditor(text: Binding(
-                get: { meeting.minutes ?? "" },
-                set: { meeting.minutes = $0 }))
-                .font(.system(size: 16))
-                .scrollContentBackground(.hidden)
-                .padding(12)
-                .background(Theme.card, in: RoundedRectangle(cornerRadius: 16))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.hairline))
+            if let errorText {
+                note(.danger, "Error", errorText)
+            }
+
+            SKWell {
+                TextEditor(text: Binding(
+                    get: { meeting.minutes ?? "" },
+                    set: { meeting.minutes = $0 }))
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(sk1Hex: palette.ink))
+                    .tint(Color(sk1Hex: palette.ink))
+                    .scrollContentBackground(.hidden)
+                    .padding(10)
+            }
 
             if working {
-                HStack(spacing: 8) { ProgressView(); Text(progressText) }
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.secondaryInk)
+                SKReadout(progressText.isEmpty ? "WORKING…" : progressText.uppercased())
             }
 
             HStack(spacing: 10) {
-                Button("Copy") { copy() }
-                    .buttonStyle(SecondaryButtonStyle())
-                ShareLink(item: meeting.minutes ?? "", subject: Text(meeting.title)) {
-                    Text("Share")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Theme.onAccent)
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 14))
+                Button {
+                    copy()
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.sk1Key(.cream, size: .large))
+                ShareLink(item: meeting.minutes ?? "", subject: Text(meeting.title)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.sk1Key(.orange, size: .large))
             }
         }
         .padding(20)
