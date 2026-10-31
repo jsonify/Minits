@@ -1,3 +1,5 @@
+import SK1Tokens
+import SK1UI
 import SwiftData
 import SwiftUI
 #if os(iOS)
@@ -5,8 +7,13 @@ import UIKit
 #endif
 
 /// After the meeting: processing, then Review (A3), Transcript and Minutes or Summary (A4).
+///
+/// SK-1 look: while processing, an LCD with a blinking WORKING lamp, the stage, how far along it is in seven-segment
+/// digits and a bar of LCD cells. If processing fails, a red lamp and the error in a sunken tray, and an orange Try
+/// again key. Once done, the tabs are an SK-1 segmented control, Review carrying how many lines need a look.
 struct MeetingView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var scheme
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @Bindable var meeting: Meeting
 
@@ -28,21 +35,10 @@ struct MeetingView: View {
                 failedView
             case .needsReview, .ready:
                 VStack(spacing: 0) {
-                    Picker("View", selection: $tab) {
-                        ForEach(Tab.allCases) { tab in
-                            if tab == .review, !meeting.linesNeedingReview.isEmpty {
-                                Text("Review · \(meeting.linesNeedingReview.count)").tag(tab)
-                            } else if tab == .minutes {
-                                Text(meeting.kind.documentName).tag(tab)
-                            } else {
-                                Text(tab.rawValue).tag(tab)
-                            }
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
+                    SKSegmented(selection: $tab, options: Tab.allCases.map(option))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     switch tab {
                     case .review: ReviewView(meeting: meeting, members: members, showAll: false)
@@ -59,53 +55,116 @@ struct MeetingView: View {
         }
         .frame(maxWidth: 640)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.ground)
+        .sk1Chassis()
         .navigationTitle(meeting.title)
         .inlineTitle()
+    }
+
+    private func option(_ tab: Tab) -> SKSegmented<Tab>.Option {
+        switch tab {
+        case .review:
+            let count = meeting.linesNeedingReview.count
+            return .init(tab, tab.rawValue, badge: count > 0 ? "\(count)" : nil)
+        case .transcript:
+            return .init(tab, tab.rawValue)
+        case .minutes:
+            return .init(tab, meeting.kind.documentName)
+        }
     }
 
     // MARK: Processing
 
     private var processingView: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 14) {
             Spacer()
-            ProgressView(value: stage.fraction)
-                .progressViewStyle(.linear)
-                .tint(Theme.accent)
-            Text(stage.label)
-                .font(Theme.heading(22))
-                .multilineTextAlignment(.center)
+            SKCaption("Making the transcript")
+            processingLCD
             Text("A one-hour meeting takes a few minutes. Keep Minits open; it all happens on this device.")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.secondaryInk)
-                .multilineTextAlignment(.center)
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
-        .padding(28)
+        .padding(20)
         .task(id: meeting.id) { await process() }
     }
 
+    private var processingLCD: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let percent = Int((stage.fraction * 100).rounded())
+        return SKLCD {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    SKLamp(color: .teal, lit: true, glow: 4, size: 7, label: "Working", blinking: true)
+                    Text("WORKING")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                    Spacer(minLength: 8)
+                    Text("ON THIS DEVICE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1)
+                        .lineLimit(1)
+                }
+
+                HStack(alignment: .bottom, spacing: 12) {
+                    Text(stage.label.uppercased())
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .tracking(0.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(alignment: .bottom, spacing: 3) {
+                        SKSevenSegment("\(percent)", digitHeight: 30, spacing: 4)
+                            .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
+                        Text("%")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    }
+                }
+
+                ProgressCells(fraction: stage.fraction)
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Working: \(stage.label)"))
+        .accessibilityValue(Text("\(percent) percent"))
+    }
+
     private var failedView: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Spacer()
-            Text("Something went wrong")
-                .font(Theme.heading(24))
-            Text(meeting.errorMessage ?? "The recording couldn't be processed.")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.secondaryInk)
-                .multilineTextAlignment(.center)
-            Button("Try again") {
+            SKCaption("Making the transcript")
+            SKWell {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        SKLamp(color: .danger, lit: true, label: "Error")
+                        SKCaption("Something went wrong")
+                    }
+                    Text(meeting.errorMessage ?? "The recording couldn't be processed.")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color(sk1Hex: palette.ink))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("The recording is still saved, so nothing is lost.")
+                        .sk1Hint()
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Button {
                 meeting.status = .processing
                 try? context.save()
+            } label: {
+                Label("Try again", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(PrimaryButtonStyle())
-            Text("The recording is still saved, so nothing is lost.")
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.secondaryInk)
+            .buttonStyle(.sk1Key(.orange, size: .large))
             Spacer()
         }
-        .padding(28)
+        .padding(20)
     }
+
+    private var palette: SK1.Palette { SK1.palette(for: scheme) }
 
     private func process() async {
         guard meeting.status == .processing || meeting.status == .recording else { return }
@@ -145,6 +204,26 @@ struct MeetingView: View {
             meeting.status = .failed
         }
         try? context.save()
+    }
+}
+
+/// How far processing has got, as a row of LCD cells: the done ones in the LCD's ink, the rest faint as an unlit
+/// seven-segment is.
+private struct ProgressCells: View {
+    let fraction: Double
+    private let count = 24
+
+    var body: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let lit = Int((min(max(fraction, 0), 1) * Double(count)).rounded())
+        HStack(spacing: 2) {
+            ForEach(0..<count, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(index < lit ? ink : ink.opacity(SK1.SevenSegment.unlitOpacity))
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
     }
 }
 
