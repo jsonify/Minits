@@ -4,7 +4,7 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
 ## How it works
 
-1. **Pick the kind of meeting.** *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. The app remembers your last choice.
+1. **Pick the kind of meeting on Home.** Two cream keys under START A MEETING: *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. Each shows what you get and an example line. The one you used last is lit with SK-1's orange bar. Tapping a key opens roll call with that kind selected; you can still switch it there.
 2. **Voice roll call.** Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
 3. **Record.** One tap. Keeps recording with the screen locked. The recording screen has one big LCD: a red REC lamp that blinks while recording ("PAUSED" when paused), the kind of meeting and how many are here, the elapsed time in seven-segment digits and the input level. Under it, three keys: **Pause/Resume**, the orange **Mark motion** key (board meeting: tap it when someone makes a motion or the board votes) or **Mark moment** (ad-hoc meeting: tap it when something is decided), and the charcoal **End** key with a red lamp, which asks before it stops. Each mark shows as a chip such as `MOTION 1 · 12:04` in the tray above the keys. If a call or another app interrupts, the recording pauses and an amber lamp says so; tap Resume to keep going.
 4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English).
@@ -19,7 +19,7 @@ The voice and transcription models download once on first use (a few hundred MB,
 
 ## Look
 
-Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.2.0 or later). It follows the system's Light or Dark Mode. The recording screen is built from SK1Kit's components; the other screens are moving over one at a time and meanwhile use `UI/Theme.swift`, a temporary bridge that maps their colours to SK-1 tokens.
+Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.2.0 or later). It follows the system's Light or Dark Mode. The Home and recording screens are built from SK1Kit's components; the other screens are moving over one at a time and meanwhile use `UI/Theme.swift`, a temporary bridge that maps their colours to SK-1 tokens.
 
 ## Build it (Mac, free Apple ID is fine)
 
@@ -55,7 +55,7 @@ Minits/
   Audio/                    16 kHz mono WAV recorder, clip playback
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
-  UI/                       Screens (roll call, recording, review, transcript, minutes/summary)
+  UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
   UI/Theme.swift            Temporary bridge from the old colours to SK-1 tokens, removed once every screen uses SK1Kit
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare

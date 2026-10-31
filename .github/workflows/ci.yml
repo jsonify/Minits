@@ -66,7 +66,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           cat ui-warnings.txt
           # Files already on SK-1 (or the bridge to it) must stay warning-free; the older screens are reported only.
-          if grep -qE '^Minits/(UI/(RecordingView|Theme)|MinitsApp)\.swift:' ui-warnings.txt; then
-            echo "::error::Warnings in RecordingView.swift, Theme.swift or MinitsApp.swift"
+          if grep -qE '^Minits/(UI/(RecordingView|HomeView|Theme)|MinitsApp)\.swift:' ui-warnings.txt; then
+            echo "::error::Warnings in RecordingView.swift, HomeView.swift, Theme.swift or MinitsApp.swift"
             exit 1
           fi
