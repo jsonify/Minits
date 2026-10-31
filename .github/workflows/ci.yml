@@ -30,6 +30,23 @@ jobs:
           brew install xcodegen
           xcodegen
 
+      # Config/Signing.xcconfig sets the app's bundle ID and team, and a gitignored Config/Local.xcconfig overrides
+      # them. Check both: the default without Local.xcconfig, and that a Local.xcconfig wins.
+      - name: Check the signing override
+        run: |
+          bundle_id() {
+            xcodebuild -showBuildSettings -project Minits.xcodeproj -target Minits -sdk iphonesimulator 2>/dev/null \
+              | awk -F' = ' '/^ *PRODUCT_BUNDLE_IDENTIFIER = /{print $2; exit}'
+          }
+          default=$(bundle_id)
+          echo "Default bundle ID: $default"
+          [ "$default" = "com.jsonify.minits" ] || { echo "::error::Expected com.jsonify.minits, got '$default'"; exit 1; }
+          printf 'PRODUCT_BUNDLE_IDENTIFIER = com.example.ci-override\n' > Config/Local.xcconfig
+          override=$(bundle_id)
+          rm Config/Local.xcconfig
+          echo "With Local.xcconfig: $override"
+          [ "$override" = "com.example.ci-override" ] || { echo "::error::Local.xcconfig didn't override the bundle ID (got '$override')"; exit 1; }
+
       - name: Build the app for iOS
         run: |
           xcodebuild build -project Minits.xcodeproj -scheme Minits \

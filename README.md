@@ -35,8 +35,7 @@ open Minits.xcodeproj
 
 In Xcode:
 
-1. Select the **Minits** target → **Signing & Capabilities** → **Team** → add your Apple ID and pick your Personal Team.
-   If Xcode says the bundle ID is taken, change `com.jsonify.minits` to something unique.
+1. **Signing.** Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your Team ID and a bundle ID your team owns (`com.jsonify.minits` is taken). Run `xcodegen` again. `Local.xcconfig` is gitignored and survives every `xcodegen` run, so you set this once. (Picking a team in **Signing & Capabilities** also works, but `xcodegen` resets it.) Your Team ID is under Xcode › Settings › Accounts, or Membership details on developer.apple.com. A free Personal Team works too.
 2. **Mac:** choose *My Mac* as the run destination and press ⌘R. A Mac build doesn't expire.
 3. **iPhone:** plug it in, choose it as the destination, press ⌘R.
    - First time: on the iPhone, turn on **Settings › Privacy & Security › Developer Mode**, then trust your profile in **Settings › General › VPN & Device Management**.
@@ -48,6 +47,7 @@ In Xcode:
 
 ```
 project.yml                 XcodeGen spec (one app target for iOS 17+ and macOS 14+; packages FluidAudio, SK1Kit)
+Config/Signing.xcconfig     App bundle ID and team defaults; includes your gitignored Config/Local.xcconfig
 .github/workflows/ci.yml    CI: builds the app for iOS and macOS and runs MinitsEvalTests on every push and PR
 Minits/
   MinitsApp.swift           App entry, navigation
