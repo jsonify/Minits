@@ -21,7 +21,7 @@ packages:
   # The SK-1 look (tokens and SwiftUI components), shared with Skreener.
   SK1Kit:
     url: https://github.com/jsonify/SK1Kit.git
-    branch: main
+    from: 0.2.0
 
 targets:
   Minits:
