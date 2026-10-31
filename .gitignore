@@ -2,6 +2,9 @@
 Minits.xcodeproj/
 Minits/Info.plist
 
+# Your signing team and bundle ID (see Config/Local.xcconfig.example)
+Config/Local.xcconfig
+
 # Xcode
 xcuserdata/
 DerivedData/

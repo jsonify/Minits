@@ -1,0 +1,7 @@
+// Signing for the Minits app target. Defaults for a fresh checkout and CI (which builds unsigned).
+// To sign with your own team, copy Local.xcconfig.example to Local.xcconfig (gitignored) and fill it in;
+// it overrides these values and survives every `xcodegen` run.
+PRODUCT_BUNDLE_IDENTIFIER = com.jsonify.minits
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

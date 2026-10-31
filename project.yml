@@ -5,7 +5,6 @@
 name: Minits
 
 options:
-  bundleIdPrefix: com.jsonify
   deploymentTarget:
     iOS: "17.0"
     macOS: "14.0"
@@ -50,16 +49,17 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    # Bundle ID and team come from Config/Signing.xcconfig, which includes your gitignored Config/Local.xcconfig.
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.jsonify.minits
         PRODUCT_NAME: Minits
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         CODE_SIGN_STYLE: Automatic
-        # Pick your Apple ID team in Xcode > Signing & Capabilities (a free Apple ID works).
-        DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_PREVIEWS: YES
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Minits/Minits-macOS.entitlements
