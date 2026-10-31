@@ -4,6 +4,11 @@ import Observation
 
 /// Records 16 kHz mono WAV, which is exactly what FluidAudio's models want,
 /// so no conversion is needed later. Works for both voice samples and full meetings.
+///
+/// The recorder itself and the audio session live on a background queue (`RecorderIO`): activating the session can
+/// block for a moment, and `AVAudioRecorder` touches the session from whichever thread calls it, so calling either
+/// from the main thread can make the UI stutter (AVAudioSession warns about exactly that). This class keeps the
+/// state the screens show, on the main actor.
 @MainActor
 @Observable
 final class AudioRecorder: NSObject {
@@ -16,19 +21,10 @@ final class AudioRecorder: NSObject {
     private(set) var levelHistory: [Float] = Array(repeating: 0, count: 40)
     private(set) var wasInterrupted = false
 
-    private var recorder: AVAudioRecorder?
-    private var timer: Timer?
-    /// The last `stop()`'s session deactivation, which `start` waits for so it can't land after a new activation.
-    private var deactivation: Task<Void, Never>?
-
-    static let settings: [String: Any] = [
-        AVFormatIDKey: kAudioFormatLinearPCM,
-        AVSampleRateKey: 16_000,
-        AVNumberOfChannelsKey: 1,
-        AVLinearPCMBitDepthKey: 16,
-        AVLinearPCMIsFloatKey: false,
-        AVLinearPCMIsBigEndianKey: false,
-    ]
+    private let io = RecorderIO()
+    @ObservationIgnored private var timer: Timer?
+    /// Set while a meter reading is on its way back, so slow readings don't pile up.
+    @ObservationIgnored private var metering = false
 
     // MARK: Permission
 
@@ -46,22 +42,13 @@ final class AudioRecorder: NSObject {
 
     // MARK: Control
 
-    /// Activating the audio session can block for a moment, so it happens off the main thread
-    /// (AVAudioSession warns that doing it on the main thread can make the UI unresponsive).
     func start(to url: URL) async throws {
+        try await io.start(url: url)
         #if os(iOS)
-        await deactivation?.value
-        deactivation = nil
-        try await Self.activateSession()
         NotificationCenter.default.addObserver(
             self, selector: #selector(handleInterruption(_:)),
             name: AVAudioSession.interruptionNotification, object: AVAudioSession.sharedInstance())
         #endif
-
-        let recorder = try AVAudioRecorder(url: url, settings: Self.settings)
-        recorder.isMeteringEnabled = true
-        guard recorder.record() else { throw RecorderError.couldNotStart }
-        self.recorder = recorder
         isRecording = true
         isPaused = false
         wasInterrupted = false
@@ -70,27 +57,20 @@ final class AudioRecorder: NSObject {
         startTimer()
     }
 
-    func pause() {
-        recorder?.pause()
+    func pause() async {
         isPaused = true
+        await io.pause()
     }
 
     func resume() async {
-        #if os(iOS)
-        // After an interruption the session may have been deactivated by the system.
-        try? await Self.activateSession()
-        #endif
-        recorder?.record()
+        await io.resume()
         isPaused = false
         wasInterrupted = false
     }
 
     /// Stops and returns the recorded duration in seconds.
     @discardableResult
-    func stop() -> TimeInterval {
-        let duration = recorder?.currentTime ?? elapsed
-        recorder?.stop()
-        recorder = nil
+    func stop() async -> TimeInterval {
         timer?.invalidate()
         timer = nil
         isRecording = false
@@ -98,42 +78,29 @@ final class AudioRecorder: NSObject {
         level = 0
         #if os(iOS)
         NotificationCenter.default.removeObserver(self, name: AVAudioSession.interruptionNotification, object: nil)
-        deactivation = Task.detached(priority: .userInitiated) {
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        }
         #endif
+        let duration = await io.stop() ?? elapsed
         return max(duration, elapsed)
     }
-
-    #if os(iOS)
-    /// .record + .default mode: no voice processing, so voices across the table aren't filtered out.
-    /// Wired/USB conference mics are picked up automatically when plugged in.
-    private nonisolated static func activateSession() async throws {
-        try await Task.detached(priority: .userInitiated) {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .default)
-            try session.setActive(true)
-        }.value
-    }
-    #endif
 
     // MARK: Metering
 
     private func startTimer() {
         timer?.invalidate()
         let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+            Task { @MainActor in await self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
 
-    private func tick() {
-        guard let recorder, isRecording else { return }
-        if !isPaused { elapsed = recorder.currentTime }
-        recorder.updateMeters()
-        let db = recorder.averagePower(forChannel: 0)          // -160…0
-        let normalized = isPaused ? 0 : max(0, min(1, (db + 50) / 50))
+    private func tick() async {
+        guard isRecording, !metering else { return }
+        metering = true
+        defer { metering = false }
+        guard let reading = await io.meter(), isRecording else { return }
+        if !isPaused { elapsed = reading.time }
+        let normalized = isPaused ? 0 : max(0, min(1, (reading.power + 50) / 50))   // power is -160…0 dB
         level = normalized
         levelHistory.removeFirst()
         levelHistory.append(normalized)
@@ -156,5 +123,91 @@ final class AudioRecorder: NSObject {
     enum RecorderError: LocalizedError {
         case couldNotStart
         var errorDescription: String? { "The microphone couldn't start recording." }
+    }
+}
+
+/// The `AVAudioRecorder` and the audio session, used only on one serial background queue. Each call waits for its
+/// work, so calls run in the order they're made.
+private final class RecorderIO: @unchecked Sendable {
+    struct Meter: Sendable {
+        let time: TimeInterval
+        let power: Float
+    }
+
+    private let queue = DispatchQueue(label: "com.jsonify.minits.recorder", qos: .userInitiated)
+    /// Only touched on `queue`.
+    private var recorder: AVAudioRecorder?
+
+    func start(url: URL) async throws {
+        try await run {
+            #if os(iOS)
+            try Self.activateSession()
+            #endif
+            let settings: [String: Any] = [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVSampleRateKey: 16_000,
+                AVNumberOfChannelsKey: 1,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false,
+            ]
+            let recorder = try AVAudioRecorder(url: url, settings: settings)
+            recorder.isMeteringEnabled = true
+            guard recorder.record() else { throw AudioRecorder.RecorderError.couldNotStart }
+            self.recorder = recorder
+        }
+    }
+
+    func pause() async {
+        try? await run { self.recorder?.pause() }
+    }
+
+    func resume() async {
+        _ = try? await run {
+            #if os(iOS)
+            // After an interruption the system may have deactivated the session.
+            try? Self.activateSession()
+            #endif
+            self.recorder?.record()
+        }
+    }
+
+    /// Stops, releases the session and returns how long the recording is (nil if nothing was recording).
+    func stop() async -> TimeInterval? {
+        let duration: TimeInterval?? = try? await run {
+            let duration = self.recorder?.currentTime
+            self.recorder?.stop()
+            self.recorder = nil
+            #if os(iOS)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            #endif
+            return duration
+        }
+        return duration ?? nil
+    }
+
+    func meter() async -> Meter? {
+        let reading: Meter?? = try? await run {
+            guard let recorder = self.recorder else { return nil }
+            recorder.updateMeters()
+            return Meter(time: recorder.currentTime, power: recorder.averagePower(forChannel: 0))
+        }
+        return reading ?? nil
+    }
+
+    #if os(iOS)
+    /// .record + .default mode: no voice processing, so voices across the table aren't filtered out.
+    /// Wired/USB conference mics are picked up automatically when plugged in.
+    private static func activateSession() throws {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .default)
+        try session.setActive(true)
+    }
+    #endif
+
+    private func run<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { continuation.resume(with: Result { try work() }) }
+        }
     }
 }

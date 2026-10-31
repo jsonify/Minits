@@ -259,8 +259,9 @@ struct VoiceSampleSheet: View {
 
     private func finish() async {
         guard phase == .recording, let url = sampleURL else { return }
-        recorder.stop()
+        // Before the await, so the 15-second auto-stop can't call this again meanwhile.
         phase = .learning
+        await recorder.stop()
         do {
             let embedding = try await VoiceEngine.shared.voiceprint(forSampleAt: url)
             modelsReady = true
@@ -282,8 +283,12 @@ struct VoiceSampleSheet: View {
     }
 
     private func close() {
-        if recorder.isRecording { recorder.stop() }
-        if let sampleURL { try? FileManager.default.removeItem(at: sampleURL) }
+        let wasRecording = recorder.isRecording
+        let url = sampleURL
+        Task {
+            if wasRecording { await recorder.stop() }
+            if let url { try? FileManager.default.removeItem(at: url) }
+        }
         dismiss()
     }
 }

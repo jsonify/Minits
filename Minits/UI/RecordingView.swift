@@ -53,7 +53,7 @@ struct RecordingView: View {
             #endif
         }
         .confirmationDialog("End the meeting?", isPresented: $confirmingEnd, titleVisibility: .visible) {
-            Button("End and make the transcript") { end() }
+            Button("End and make the transcript") { Task { await end() } }
             Button("Keep recording", role: .cancel) {}
         } message: {
             Text("Minits will stop recording and start working out who said what.")
@@ -185,10 +185,8 @@ struct RecordingView: View {
         SKKeyTray(caption: "Transport") {
             KeyRow(spacing: 3, weights: [1, 1.6, 1]) {
                 Button {
-                    if recorder.isPaused {
-                        Task { await recorder.resume() }
-                    } else {
-                        recorder.pause()
+                    Task {
+                        if recorder.isPaused { await recorder.resume() } else { await recorder.pause() }
                     }
                 } label: {
                     KeyLabel(recorder.isPaused ? "Resume" : "Pause",
@@ -251,8 +249,8 @@ struct RecordingView: View {
         try? context.save()
     }
 
-    private func end() {
-        meeting.durationSeconds = recorder.stop()
+    private func end() async {
+        meeting.durationSeconds = await recorder.stop()
         meeting.status = .processing
         try? context.save()
         router.showMeeting(meeting)
