@@ -19,17 +19,17 @@ struct CassetteDeck: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            CassetteWindow(title: title, date: date, duration: player.duration, position: player.position,
-                           playing: player.isPlaying)
-                .frame(height: 132)
+            // The cassette between the knobs. The window is sized to the cassette, so it has no empty glass at its
+            // sides: as tall as fits the width, up to 170 pt.
+            ViewThatFits(in: .horizontal) {
+                cassetteRow(height: 170)
+                cassetteRow(height: 140)
+                cassetteRow(height: 112)
+            }
 
             HStack(spacing: 8) {
-                DeckKnob(title: "Volume", position: $volume, scale: SK1.KnobScale(kind: .smooth(min: 0, max: 10, step: 1)),
-                         endLabels: ("0", "10")) { "\($0)" }
                 VUMeter(level: player.levels.0, label: player.isStereo ? "LEFT" : "AVG")
                 VUMeter(level: player.levels.1, label: player.isStereo ? "RIGHT" : "PEAK")
-                DeckKnob(title: "Speed", position: $speed, scale: SK1.KnobScale(kind: .stops(count: DeckSpeed.rates.count)),
-                         endLabels: ("¾", "2")) { DeckSpeed.label(DeckSpeed.rates[$0]) }
             }
             .frame(height: 56)
 
@@ -40,6 +40,20 @@ struct CassetteDeck: View {
         }
         .onChange(of: volume, initial: true) { _, value in player.volume = Float(value) / 10 }
         .onChange(of: speed, initial: true) { _, index in player.rate = DeckSpeed.rates[index] }
+    }
+
+    /// VOLUME, the cassette window `height` tall, and SPEED, centred.
+    private func cassetteRow(height: CGFloat) -> some View {
+        HStack(spacing: 10) {
+            DeckKnob(title: "Volume", position: $volume, scale: SK1.KnobScale(kind: .smooth(min: 0, max: 10, step: 1)),
+                     endLabels: ("0", "10")) { "\($0)" }
+            CassetteWindow(title: title, date: date, duration: player.duration, position: player.position,
+                           playing: player.isPlaying)
+                .frame(width: CassetteWindow.width(forHeight: height), height: height)
+            DeckKnob(title: "Speed", position: $speed, scale: SK1.KnobScale(kind: .stops(count: DeckSpeed.rates.count)),
+                     endLabels: ("¾", "2")) { DeckSpeed.label(DeckSpeed.rates[$0]) }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: Transport
@@ -175,7 +189,7 @@ struct CassetteWindow: View {
         Canvas { ctx, size in
             let bounds = CGRect(origin: .zero, size: size)
             Self.drawWindow(ctx, bounds, palette: p) { inside, inner in
-                let cassette = Self.fit(in: inner.insetBy(dx: 10, dy: 8))
+                let cassette = Self.fit(in: inner.insetBy(dx: Self.margin, dy: Self.margin))
                 Self.drawCassette(inside, cassette, label: label, reels: reels, spin: !reduceMotion)
             }
         }
@@ -203,9 +217,20 @@ struct CassetteWindow: View {
         return "C120"
     }
 
+    /// From the window's edge to the cassette: the 6 pt bezel, then the recess round the tape.
+    static let bezel: CGFloat = 6
+    static let margin: CGFloat = 8
+
+    /// How wide the window is when it's `height` tall, so the cassette fills it with only the margin round it.
+    static func width(forHeight height: CGFloat) -> CGFloat {
+        let border = 2 * (bezel + margin)
+        return (height - border) * aspect + border
+    }
+
+    static let aspect: CGFloat = 100.4 / 63.8
+
     /// A cassette's proportions (100.4 × 63.8 mm), as large as fits in `rect`, centred.
     static func fit(in rect: CGRect) -> CGRect {
-        let aspect: CGFloat = 100.4 / 63.8
         var w = rect.width, h = w / aspect
         if h > rect.height { h = rect.height; w = h * aspect }
         return CGRect(x: rect.midX - w / 2, y: rect.midY - h / 2, width: w, height: h)
@@ -224,7 +249,7 @@ struct CassetteWindow: View {
         ctx.stroke(outer, with: .color(.black.opacity(p.dark ? 0.5 : 0.18)), lineWidth: 0.5)
 
         // The recess.
-        let inner = rect.insetBy(dx: 6, dy: 6)
+        let inner = rect.insetBy(dx: bezel, dy: bezel)
         let recess = Path(roundedRect: inner, cornerRadius: 7, style: .continuous)
         ctx.fill(recess, with: .linearGradient(Gradient(colors: [Color(sk1Hex: 0x2a2926), Color(sk1Hex: 0x3a3833)]),
                                                startPoint: CGPoint(x: inner.midX, y: inner.minY),
