@@ -57,6 +57,23 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "15-rename-meeting", inNavigationStack: false) { f in
                 AnyView(MeetingTitleSheet(title: f.minutes.title) { _ in })
             },
+            Screen(name: "17-home-downloading-models", inNavigationStack: false) { _ in
+                AnyView(ScrollView {
+                    ModelSetupCard(
+                        preparing: true,
+                        progress: ModelDownloadProgress(model: .transcription, phase: .downloading(file: 2, of: 5),
+                                                        modelFraction: 0.4),
+                        error: nil) {}
+                        .padding(20)
+                })
+            },
+            Screen(name: "18-home-download-failed", inNavigationStack: false) { _ in
+                AnyView(ScrollView {
+                    ModelSetupCard(preparing: false, progress: nil,
+                                   error: "Download didn't finish: The Internet connection appears to be offline.") {}
+                        .padding(20)
+                })
+            },
         ]
 
         for screen in screens {
