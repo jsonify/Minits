@@ -24,7 +24,7 @@ final class MemberAndMeetingEditTests: XCTestCase {
 
     func testNextColorIsTheFirstNoOneHas() throws {
         let context = try makeContext()
-        let members = [0, 1, 3].map { member("M\($0)", color: $0, in: context) }
+        let members = [0, 1, 3].map { (color: Int) in member("M\(color)", color: color, in: context) }
         XCTAssertEqual(Member.nextColor(among: members), 2)
         XCTAssertEqual(Member.nextColor(among: []), 0)
     }
