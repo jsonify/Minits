@@ -5,8 +5,9 @@ import SwiftUI
 
 /// Screen A3 ("Check who said what") and the full transcript, which share the same line cards.
 ///
-/// SK-1 look: Review opens with an LCD (how many lines are left to check, in seven-segment digits); the transcript
-/// with a Motions only toggle and a Share key. Each line is a sunken tray: the speaker, the time on an LCD chip and a
+/// SK-1 look: Review opens with an LCD (how many lines are left to check, in seven-segment digits). The transcript has
+/// the cassette deck (`CassetteDeck`) pinned above it, playing the whole meeting, then a Motions only toggle and a
+/// Share key; the line being played is marked with a lit lamp and the list follows it. Each line is a sunken tray: the speaker, the time on an LCD chip and a
 /// play key; a flagged line has an amber lamp and the reason, and its choices are keys, the current guess lit.
 struct ReviewView: View {
     @Environment(\.modelContext) private var context
@@ -15,32 +16,49 @@ struct ReviewView: View {
     let showAll: Bool
 
     @State private var player = ClipPlayer()
+    @State private var deck = MeetingPlayer()
     @State private var motionsOnly = false
     @State private var namingGuest: TranscriptLine?
     @State private var guestName = ""
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                intro
-                ForEach(visibleLines) { line in
-                    LineCard(
-                        line: line,
-                        members: members,
-                        expanded: line.needsReview && !showAll,
-                        isPlaying: player.playingLineID == line.id,
-                        play: { player.toggle(lineID: line.id, url: meeting.audioURL, from: line.start, to: line.end) },
-                        choose: { member in assign(line, to: member) },
-                        confirm: { confirm(line) },
-                        nameGuest: {
-                            guestName = ""
-                            namingGuest = line
-                        })
+        VStack(spacing: 0) {
+            if showAll {
+                CassetteDeck(player: deck, title: meeting.title, date: meeting.startedAt)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
+                SKGroove()
+            }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        intro
+                        ForEach(visibleLines) { line in
+                            card(line)
+                        }
+                    }
+                    .padding(20)
+                }
+                .onChange(of: deck.currentLineID) { _, id in
+                    // Follow along while the deck plays.
+                    guard showAll, deck.isPlaying, let id, visibleLines.contains(where: { $0.id == id }) else { return }
+                    withAnimation(.easeInOut(duration: 0.3)) { proxy.scrollTo(id, anchor: .center) }
                 }
             }
-            .padding(20)
         }
-        .onDisappear { player.stop() }
+        .onAppear {
+            guard showAll else { return }
+            deck.load(url: meeting.audioURL, duration: meeting.durationSeconds)
+        }
+        .onChange(of: meeting.lines.count, initial: true) {
+            guard showAll else { return }
+            deck.marks = meeting.sortedLines.map { MeetingPlayer.Mark(id: $0.id, start: $0.start, end: $0.end) }
+        }
+        .onDisappear {
+            player.stop()
+            deck.stop()
+        }
         .alert("Who is \(namingGuest?.speakerName ?? "this")?", isPresented: Binding(
             get: { namingGuest != nil }, set: { if !$0 { namingGuest = nil } }
         )) {
@@ -53,6 +71,32 @@ struct ReviewView: View {
         } message: {
             Text("Every line from \(namingGuest?.speakerName ?? "this voice") will use the name.")
         }
+    }
+
+    /// One line. On the transcript its play key plays the deck from that line (pausing it if that line is playing);
+    /// on Review it plays just that line.
+    private func card(_ line: TranscriptLine) -> some View {
+        let onDeck = showAll && deck.currentLineID == line.id
+        return LineCard(
+            line: line,
+            members: members,
+            expanded: line.needsReview && !showAll,
+            isPlaying: showAll ? onDeck && deck.isPlaying : player.playingLineID == line.id,
+            isCurrent: onDeck,
+            pausesDeck: showAll,
+            play: {
+                if showAll {
+                    deck.toggleLine(MeetingPlayer.Mark(id: line.id, start: line.start, end: line.end))
+                } else {
+                    player.toggle(lineID: line.id, url: meeting.audioURL, from: line.start, to: line.end)
+                }
+            },
+            choose: { member in assign(line, to: member) },
+            confirm: { confirm(line) },
+            nameGuest: {
+                guestName = ""
+                namingGuest = line
+            })
     }
 
     // MARK: Header
@@ -186,6 +230,10 @@ private struct LineCard: View {
     let members: [Member]
     let expanded: Bool
     let isPlaying: Bool
+    /// The deck's playhead is on this line (playing or paused).
+    var isCurrent = false
+    /// The play key drives the deck, so it pauses rather than stops.
+    var pausesDeck = false
     let play: () -> Void
     let choose: (Member) -> Void
     let confirm: () -> Void
@@ -220,13 +268,17 @@ private struct LineCard: View {
                         .accessibilityHint(Text("Change who said this"))
                     }
                     Spacer(minLength: 8)
+                    if isCurrent {
+                        SKLamp(color: .orange, lit: true, glow: 4, size: 7, label: "On the deck")
+                    }
                     SKChip(line.start.clock)
                         .accessibilityLabel(Text("At \(line.start.clock)"))
                     Button(action: play) {
-                        Image(systemName: isPlaying ? "stop.fill" : "play.fill")
+                        Image(systemName: isPlaying ? (pausesDeck ? "pause.fill" : "stop.fill") : "play.fill")
                     }
                     .buttonStyle(.sk1Key(isOn: isPlaying))
-                    .accessibilityLabel(Text(isPlaying ? "Stop" : "Play this line"))
+                    .accessibilityLabel(Text(isPlaying ? (pausesDeck ? "Pause" : "Stop")
+                                                       : (pausesDeck ? "Play from this line" : "Play this line")))
                 }
 
                 Text(line.text)

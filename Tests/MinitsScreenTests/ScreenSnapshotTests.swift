@@ -57,6 +57,9 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "15-rename-meeting", inNavigationStack: false) { f in
                 AnyView(MeetingTitleSheet(title: f.minutes.title) { _ in })
             },
+            Screen(name: "16-cassette-deck-playing") { f in
+                AnyView(CassetteDeckScreen(player: f.playingDeck, title: f.review.title, date: f.review.startedAt))
+            },
         ]
 
         for screen in screens {

@@ -14,6 +14,8 @@ struct ScreenFixtures {
     let review: Meeting
     let minutes: Meeting
     let summaryToWrite: Meeting
+    /// The cassette deck 23 minutes into the review meeting, playing, the meters up.
+    let playingDeck: MeetingPlayer
 
     /// A store with nothing in it, for the empty Home screen.
     static func emptyContainer() throws -> ModelContainer {
@@ -74,6 +76,9 @@ struct ScreenFixtures {
             line.needsReview = false
             return line
         }
+
+        playingDeck = MeetingPlayer()
+        playingDeck.stage(position: 1_385, duration: review.durationSeconds, state: .playing, levels: (0.58, 0.81))
 
         try context.save()
     }
