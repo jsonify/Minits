@@ -259,26 +259,6 @@ struct MeetingView: View {
     }
 }
 
-/// How far processing has got, as a row of LCD cells: the done ones in the LCD's ink, the rest faint as an unlit
-/// seven-segment is.
-private struct ProgressCells: View {
-    let fraction: Double
-    private let count = 24
-
-    var body: some View {
-        let ink = Color(sk1Hex: SK1.lcdInk)
-        let lit = Int((min(max(fraction, 0), 1) * Double(count)).rounded())
-        HStack(spacing: 2) {
-            ForEach(0..<count, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(index < lit ? ink : ink.opacity(SK1.SevenSegment.unlitOpacity))
-            }
-        }
-        .frame(height: 10)
-        .accessibilityHidden(true)
-    }
-}
-
 /// Stops the same meeting from being processed twice if its screen appears again.
 @MainActor
 enum MeetingProcessing {

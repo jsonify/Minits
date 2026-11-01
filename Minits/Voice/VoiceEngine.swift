@@ -49,6 +49,66 @@ enum ProcessingStage: Sendable, Equatable {
     }
 }
 
+/// How far the one-time model download has got, for Home: which model, what it's doing, and how far along the whole
+/// download is. The voice (diarizer) models are small and come first; the transcription model is most of the bytes.
+struct ModelDownloadProgress: Sendable, Equatable {
+    enum Model: Sendable, Equatable {
+        case voice, transcription
+
+        /// The share of the whole download this model's own 0…1 maps onto.
+        var span: ClosedRange<Double> {
+            switch self {
+            case .voice: return 0...0.15
+            case .transcription: return 0.15...1
+            }
+        }
+
+        var name: String {
+            switch self {
+            case .voice: return "Voice models"
+            case .transcription: return "Transcription model"
+            }
+        }
+    }
+
+    enum Phase: Sendable, Equatable {
+        case listing
+        case downloading(file: Int, of: Int)
+        case compiling
+    }
+
+    let model: Model
+    let phase: Phase
+    /// The whole download, 0…1.
+    let fraction: Double
+
+    /// `modelFraction` is this model's own progress (0…1); it's mapped onto the model's share of the whole download.
+    init(model: Model, phase: Phase, modelFraction: Double) {
+        self.model = model
+        self.phase = phase
+        let clamped = min(max(modelFraction.isFinite ? modelFraction : 0, 0), 1)
+        fraction = model.span.lowerBound + (model.span.upperBound - model.span.lowerBound) * clamped
+    }
+
+    /// A step of `model` with the whole download already at `overall` (0…1).
+    init(model: Model, phase: Phase, overall: Double) {
+        self.model = model
+        self.phase = phase
+        fraction = min(max(overall, 0), 1)
+    }
+
+    /// What it's doing, for the LCD: "VOICE MODELS · FILE 3 OF 7", "COMPILING TRANSCRIPTION MODEL".
+    var label: String {
+        switch phase {
+        case .listing: return "Finding \(model.name.lowercased())"
+        case .downloading(let file, let total) where total > 0:
+            return "\(model.name) · file \(min(file + 1, total)) of \(total)"
+        case .downloading: return "Downloading \(model.name.lowercased())"
+        case .compiling: return "Setting up \(model.name.lowercased())"
+        }
+    }
+}
+
 /// Tuning knobs for voice matching (cosine similarity of WeSpeaker voiceprints), broken out so the
 /// eval CLI can override them without touching `VoiceEngine` itself.
 /// Same person usually scores well above 0.5; different people usually below 0.3.
@@ -90,7 +150,7 @@ actor VoiceEngine {
 
     // MARK: Models
 
-    private func diarizerManager() async throws -> OfflineDiarizerManager {
+    private func diarizerManager(progress: ProgressHandler? = nil) async throws -> OfflineDiarizerManager {
         if let diarizer { return diarizer }
         var config = OfflineDiarizerConfig.default
         #if os(iOS)
@@ -98,25 +158,48 @@ actor VoiceEngine {
         config.segmentation.batchSize = 8
         #endif
         let manager = OfflineDiarizerManager(config: config)
-        try await manager.prepareModels()
+        // With a progress handler, load the models ourselves so the download reports progress; if that fails,
+        // prepareModels() clears the cache and tries again, as it always has.
+        if let progress, let models = try? await OfflineDiarizerModels.load(progressHandler: progress) {
+            manager.initialize(models: models)
+        } else {
+            try await manager.prepareModels()
+        }
         diarizer = manager
         return manager
     }
 
-    private func asrManager() async throws -> AsrManager {
+    private func asrManager(progress: ProgressHandler? = nil) async throws -> AsrManager {
         if let asr { return asr }
         // v2 is the English-only Parakeet model: better recall on long English meetings.
-        let models = try await AsrModels.downloadAndLoad(version: .v2)
+        let models = try await AsrModels.downloadAndLoad(version: .v2, progressHandler: progress)
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
         asr = manager
         return manager
     }
 
-    /// Downloads and warms up both models so the first meeting isn't slow.
-    func prepare() async throws {
-        _ = try await diarizerManager()
-        _ = try await asrManager()
+    /// Downloads and warms up both models so the first meeting isn't slow. `progress` is called (on any queue) as the
+    /// download goes; models already on the device report nothing and load straight away.
+    func prepare(progress: (@Sendable (ModelDownloadProgress) -> Void)? = nil) async throws {
+        _ = try await diarizerManager(progress: progress.map { report in Self.handler(for: .voice, report) })
+        _ = try await asrManager(progress: progress.map { report in Self.handler(for: .transcription, report) })
+    }
+
+    /// Turns FluidAudio's progress for one model into ours.
+    private static func handler(
+        for model: ModelDownloadProgress.Model,
+        _ report: @escaping @Sendable (ModelDownloadProgress) -> Void
+    ) -> ProgressHandler {
+        { update in
+            let phase: ModelDownloadProgress.Phase
+            switch update.phase {
+            case .listing: phase = .listing
+            case .downloading(let completed, let total): phase = .downloading(file: completed, of: total)
+            case .compiling: phase = .compiling
+            }
+            report(ModelDownloadProgress(model: model, phase: phase, modelFraction: update.fractionCompleted))
+        }
     }
 
     // MARK: Enrollment

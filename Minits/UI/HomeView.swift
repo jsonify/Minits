@@ -2,6 +2,9 @@ import SK1Tokens
 import SK1UI
 import SwiftData
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 /// Screen A0: the meetings so far, and where a new one starts.
 ///
@@ -19,6 +22,7 @@ struct HomeView: View {
     @AppStorage("lastMeetingKind") private var lastKind: MeetingKind = .board
     @State private var preparing = false
     @State private var prepareError: String?
+    @State private var download: ModelDownloadProgress?
     @State private var renaming: Meeting?
     @State private var deleting: Meeting?
 
@@ -159,34 +163,8 @@ struct HomeView: View {
     // MARK: - One-time setup
 
     private var setup: some View {
-        VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
-            SKCaption("One-time setup")
-            SKWell {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Minits needs to download its voice and transcription models (a few hundred MB). After that, everything runs on this device, even with no internet. Wi-Fi recommended.")
-                        .sk1Hint()
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let prepareError {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            SKLamp(color: .danger, lit: true, label: "Error")
-                            Text(prepareError)
-                                .sk1Hint()
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    if preparing {
-                        // VoiceEngine.prepare() reports no progress, so this is a status, not a bar.
-                        SKReadout("DOWNLOADING MODELS…")
-                    }
-                    Button("Download now") {
-                        Task { await prepare() }
-                    }
-                    .buttonStyle(.sk1Key(.cream))
-                    .disabled(preparing)
-                }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        ModelSetupCard(preparing: preparing, progress: download, error: prepareError) {
+            Task { await prepare() }
         }
     }
 
@@ -261,13 +239,30 @@ struct HomeView: View {
     private func prepare() async {
         preparing = true
         prepareError = nil
+        download = nil
+        #if os(iOS)
+        // A few hundred MB: keep the screen on so the download isn't cut off by auto-lock.
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer { UIApplication.shared.isIdleTimerDisabled = false }
+        #endif
         do {
-            try await VoiceEngine.shared.prepare()
+            try await VoiceEngine.shared.prepare { update in
+                Task { @MainActor in
+                    // FluidAudio reports each batch of files from 0 again; never let the bar go backwards.
+                    if let current = download, update.fraction < current.fraction {
+                        download = ModelDownloadProgress(model: update.model, phase: update.phase,
+                                                         overall: current.fraction)
+                    } else {
+                        download = update
+                    }
+                }
+            }
             modelsReady = true
         } catch {
             prepareError = "Download didn't finish: \(error.localizedDescription)"
         }
         preparing = false
+        download = nil
     }
 
     /// Members saved before avatar colours were stored keep the colour they had (their place in the list).
@@ -326,5 +321,91 @@ private extension MeetingKind {
         case .board: return "Motion carried 5–0, moved by the treasurer"
         case .adHoc: return "Decided: launch Friday. Sam sends the invite."
         }
+    }
+}
+
+/// The one-time model download on Home: what it's for, a Download now key, and while it runs an LCD with a blinking
+/// lamp, the model and step, how far along the whole download is in seven-segment digits, and a bar of cells (like the
+/// processing LCD). A failed download shows a red lamp and the error, and the key stays to try again.
+struct ModelSetupCard: View {
+    let preparing: Bool
+    /// The latest progress; nil before the first report (or when the models are already on the device and just load).
+    let progress: ModelDownloadProgress?
+    let error: String?
+    let download: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+            SKCaption("One-time setup")
+            SKWell {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Minits needs to download its voice and transcription models (a few hundred MB). After that, everything runs on this device, even with no internet. Wi-Fi recommended.")
+                        .sk1Hint()
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let error {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            SKLamp(color: .danger, lit: true, label: "Error")
+                            Text(error)
+                                .sk1Hint()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    if preparing {
+                        lcd
+                        Text("Keep Minits open until it's done.")
+                            .sk1Hint()
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Button(error == nil ? "Download now" : "Try again", action: download)
+                            .buttonStyle(.sk1Key(.cream))
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var lcd: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let fraction = progress?.fraction ?? 0
+        let percent = Int((fraction * 100).rounded(.down))
+        let step = progress?.label ?? "Starting the download"
+        return SKLCD {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 6) {
+                    SKLamp(color: .teal, lit: true, glow: 4, size: 7, label: "Downloading", blinking: true)
+                    Text("DOWNLOADING")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                    Spacer(minLength: 8)
+                    Text("ONE TIME ONLY")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1)
+                        .lineLimit(1)
+                }
+                HStack(alignment: .bottom, spacing: 12) {
+                    Text(step.uppercased())
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .tracking(0.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(alignment: .bottom, spacing: 3) {
+                        SKSevenSegment("\(percent)", digitHeight: 30, spacing: 4)
+                            .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
+                        Text("%")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    }
+                }
+                ProgressCells(fraction: fraction)
+            }
+            .foregroundStyle(ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Downloading models: \(step)"))
+        .accessibilityValue(Text("\(percent) percent"))
     }
 }
