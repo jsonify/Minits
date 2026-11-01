@@ -20,6 +20,8 @@ struct HomeView: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage("modelsReady") private var modelsReady = false
     @AppStorage("lastMeetingKind") private var lastKind: MeetingKind = .board
+    @AppStorage("hasSeenIntro") private var hasSeenIntro = false
+    @State private var showingIntro = false
     @State private var preparing = false
     @State private var prepareError: String?
     @State private var download: ModelDownloadProgress?
@@ -51,6 +53,11 @@ struct HomeView: View {
         .navigationTitle("")
         .inlineTitle()
         .task { fillInColors() }
+        .onAppear(perform: showIntroIfNew)
+        .introCover(isPresented: $showingIntro) {
+            hasSeenIntro = true
+            showingIntro = false
+        }
         .sheet(item: $renaming) { meeting in
             MeetingTitleSheet(title: meeting.title) { title in
                 meeting.title = title
@@ -263,6 +270,17 @@ struct HomeView: View {
         }
         preparing = false
         download = nil
+    }
+
+    /// The intro shows once, on a fresh install. Anyone who already has members or meetings (from before the intro
+    /// existed) has clearly found their way, so it's marked as seen for them without showing.
+    private func showIntroIfNew() {
+        guard !hasSeenIntro else { return }
+        if meetings.isEmpty, members.isEmpty {
+            showingIntro = true
+        } else {
+            hasSeenIntro = true
+        }
     }
 
     /// Members saved before avatar colours were stored keep the colour they had (their place in the list).
