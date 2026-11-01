@@ -4,9 +4,13 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
 ## How it works
 
+**First run.** A fresh install opens with a one-time intro, full screen on iPhone and as a sheet on Mac. It has a WELCOME LCD, the three steps (record, who said what, minutes or a summary) as numbered trays, a teal *On this device* note, an amber *Before you record* reminder to tell everyone they're being recorded, and the microphone's state as a lamp. The orange **Allow microphone** key asks for the mic once, then becomes **Get started**; **Not now** skips asking, and roll call asks later instead. If the mic is off, a red lamp says where to turn it on, and on iPhone an **Open Settings** key goes there. The intro doesn't come back after that. Anyone updating from a version without it (members or meetings already saved) never sees it. To see it again, delete and reinstall the app.
+
 1. **Pick the kind of meeting on Home.** Two cream keys under START A MEETING: *Board meeting* gets formal minutes; *Ad-hoc meeting* gets a plain summary. Each shows what you get and an example line. The one you used last is lit with SK-1's orange bar. Tapping a key opens roll call with that kind selected; you can still switch it there.
 2. **Voice roll call.** Roll call shows an LCD with how many are here and how many of them have a voice saved, then the members as rows in one tray: tap a row to mark someone here or not (an indicator square shows which), touch and hold (right-click on Mac) to **Edit…**, re-record or remove. **Edit…** opens the member sheet with their name and role filled in; their saved voice stays. If you change the name, a **Rename in past transcripts** toggle (off by default) also renames every line already marked as them. Minutes and summaries already written keep the old name until you redraft. Each member keeps their avatar colour: a new member gets the first colour nobody has, and removing someone doesn't recolour the rest. A teal lamp means the voice is saved; otherwise the row has a **Record** key. **Add member or guest** opens a sheet with LCD text fields for the name and an optional role; once added, their voice sample starts. The meeting name is an LCD text field too, and the orange **Start meeting** key sits at the bottom. Each member says one sentence (about 10 seconds). [FluidAudio](https://github.com/FluidInference/FluidAudio) turns it into a voiceprint, saved for future meetings. The voice sample sheet works like the recording screen: an LCD with a status lamp, the member's name and role, the elapsed time and the input level, the line to read in a tray, and the orange **Record** key. **Stop** (charcoal, red lamp) works after 4 seconds and stops on its own at 15. If the new voice sounds a lot like another member's, an amber lamp says so. Optional in an ad-hoc meeting: saved members start as not here, and anyone without a voice shows as Guest 1, Guest 2…
 3. **Record.** One tap. Keeps recording with the screen locked. The recording screen has one big LCD: a red REC lamp that blinks while recording ("PAUSED" when paused), the kind of meeting and how many are here, the elapsed time in seven-segment digits and the input level. Under it, three keys: **Pause/Resume**, the orange **Mark motion** key (board meeting: tap it when someone makes a motion or the board votes) or **Mark moment** (ad-hoc meeting: tap it when something is decided), and the charcoal **End** key with a red lamp, which asks before it stops. Each mark shows as a chip such as `MOTION 1 · 12:04` in the tray above the keys. If a call or another app interrupts, the recording pauses and an amber lamp says so; tap Resume to keep going.
+
+   **On the lock screen (iPhone).** While it records, a Live Activity shows on the lock screen and in the Dynamic Island. On the lock screen it's an olive LCD with the red REC lamp (PAUSED or INTERRUPTED when paused), the kind of meeting and how many are here, the elapsed time, how many motions or moments are marked and the meeting's name, with a **Pause/Resume** key and the orange **Mark motion** (or **Mark moment**) key under it. Both keys work without unlocking. The Dynamic Island shows the lamp and the time; touch and hold it for the keys. Tap anywhere else to open Minits. It goes away when the meeting ends, and at the next launch if the app was closed mid-meeting. Turn it off in Settings › Minits › Live Activities.
 4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English). While it works, an LCD shows a blinking WORKING lamp, the current step, how far along it is as a percentage and a bar of cells. If it fails, a red lamp shows the error and the orange **Try again** key starts over; the recording is kept. When it's done, a segmented control switches between **Review** (with how many lines need a look, e.g. `REVIEW · 3`), **Transcript** and **Minutes** or **Summary**.
 5. **Review.** Lines the app isn't sure about are flagged. An LCD shows how many are left to check. Each line is a tray with the speaker, its time on an LCD chip and a play key; a flagged line has an amber lamp with the reason and its choices as keys, the current guess lit with the orange bar. Play the line, tap the right name, or **Someone else…** for the full list. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines. The Transcript tab shows every line, with a **Motions only** toggle and a **Share** key, under a cassette deck that plays the whole meeting (see **Transcript playback**).
 6. **Minutes or summary.** On iOS 26 / macOS 26 with Apple Intelligence, the write-up is drafted on-device:
@@ -28,7 +32,7 @@ The line being played has a lit orange lamp, and the list scrolls to follow it. 
 
 **Renaming or deleting a meeting.** On a meeting's screen, the **Edit** menu (top right) has **Rename…** and **Delete meeting…**. On Home, touch and hold (right-click on Mac) a past meeting for the same two. Rename opens an LCD text field. Delete asks first, then removes the recording, transcript and write-up from the device; from the meeting's screen it also goes back to Home. Neither is offered while a meeting is recording or processing.
 
-The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline.
+The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline. Until they're on the device, Home shows a **One-time setup** tray with a **Download now** key. While it downloads, an LCD there shows a blinking DOWNLOADING lamp, which model and step it's on (e.g. `TRANSCRIPTION MODEL · FILE 3 OF 5`, then `SETTING UP TRANSCRIPTION MODEL`), how far along the whole download is as a percentage, and a bar of cells. On iPhone the screen stays on until it's done. If it fails, a red lamp shows why and the key reads **Try again**.
 
 ## Look
 
@@ -49,7 +53,7 @@ open Minits.xcodeproj
 
 In Xcode:
 
-1. **Signing.** Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your Team ID and a bundle ID your team owns (`com.jsonify.minits` is taken). Run `xcodegen` again. `Local.xcconfig` is gitignored and survives every `xcodegen` run, so you set this once. (Picking a team in **Signing & Capabilities** also works, but `xcodegen` resets it.) Your Team ID is under Xcode › Settings › Accounts, or Membership details on developer.apple.com. A free Personal Team works too.
+1. **Signing.** Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` and fill in your Team ID and a bundle ID your team owns (`com.jsonify.minits` is taken). Run `xcodegen` again. The Live Activity extension uses the same team and your bundle ID plus `.recording`, so there's nothing more to set. `Local.xcconfig` is gitignored and survives every `xcodegen` run, so you set this once. (Picking a team in **Signing & Capabilities** also works, but `xcodegen` resets it.) Your Team ID is under Xcode › Settings › Accounts, or Membership details on developer.apple.com. A free Personal Team works too.
 2. **Mac:** choose *My Mac* as the run destination and press ⌘R. A Mac build doesn't expire.
 3. **iPhone:** plug it in, choose it as the destination, press ⌘R.
    - First time: on the iPhone, turn on **Settings › Privacy & Security › Developer Mode**, then trust your profile in **Settings › General › VPN & Device Management**.
@@ -62,7 +66,7 @@ If you skip the regenerate, the build fails. It fails with *Unable to resolve mo
 ## Project layout
 
 ```
-project.yml                 XcodeGen spec (one app target for iOS 17+ and macOS 14+; packages FluidAudio, SK1Kit)
+project.yml                 XcodeGen spec (one app target for iOS 17+ and macOS 14+, the iOS Live Activity extension; packages FluidAudio, SK1Kit)
 Config/Signing.xcconfig     App bundle ID and team defaults; includes your gitignored Config/Local.xcconfig
 .githooks/                  Git hooks that run xcodegen after a pull, merge, branch switch or rebase (turn on: git config core.hooksPath .githooks)
 .github/workflows/ci.yml    CI: builds the app for iOS and macOS and runs MinitsEvalTests on every push and PR
@@ -74,14 +78,17 @@ Minits/
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
   Export/MinutesPDF.swift   The minutes or summary as a printable PDF (Core Text; reads the draft's Markdown, paginates)
+  LiveActivity/             The recording's Live Activity: its attributes and Pause/Mark intents (shared with the extension), and starting/updating/ending it
+MinitsRecordingWidget/      Widget extension (iOS): draws the recording's Live Activity on the lock screen and in the Dynamic Island
   UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
   UI/MeetingTitleSheet.swift Rename a meeting (from Home and the meeting screen)
   UI/CassetteDeck.swift     The transcript's cassette deck: cassette and reels, VU meters, knobs, piano-key transport, counter
+  UI/IntroView.swift        The first-run intro: how it works, on this device, the consent reminder, the microphone
   UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
-Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
+Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, model download progress, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
 Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), and tests of member and meeting edits and the PDF export; run on the iOS Simulator
 docs/specs/                 Feature specs
 ```
@@ -99,7 +106,7 @@ CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme 
 
 ### Screenshots
 
-`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with the cassette deck at rest), the cassette deck mid-meeting while it plays, a summary not yet written, finished minutes, and the Edit member and Rename meeting sheets. Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
+`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with the cassette deck at rest), the cassette deck mid-meeting while it plays, a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, Home's model download tray (downloading, and failed), and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
 
 - **On a PR:** open the CI run's Summary page and download the `minits-screens` artifact (PNGs at 2x, named like `10-review-iphone-dark.png`).
 - **Locally:** run the command above. With `MINITS_SNAPSHOT_DIR` set (on the command line, as `TEST_RUNNER_MINITS_SNAPSHOT_DIR`, or in the scheme's environment) the PNGs are written there. Either way they're attached to the test results in Xcode's Report navigator.

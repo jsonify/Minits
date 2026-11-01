@@ -28,6 +28,27 @@ final class AudioRecorder: NSObject {
 
     // MARK: Permission
 
+    enum Permission: Sendable, Equatable {
+        case undetermined, granted, denied
+    }
+
+    /// Whether Minits may use the microphone, without asking.
+    nonisolated static var permission: Permission {
+        #if os(iOS)
+        switch AVAudioApplication.shared.recordPermission {
+        case .granted: return .granted
+        case .denied: return .denied
+        default: return .undetermined
+        }
+        #else
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return .granted
+        case .notDetermined: return .undetermined
+        default: return .denied
+        }
+        #endif
+    }
+
     static func requestPermission() async -> Bool {
         #if os(iOS)
         return await AVAudioApplication.requestRecordPermission()

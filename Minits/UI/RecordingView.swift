@@ -11,6 +11,9 @@ import UIKit
 /// SK-1 look: the meeting's title, one big LCD (REC lamp, kind and head count, the elapsed time in seven-segment
 /// digits, the input level), notes, the marks as LCD chips in a sunken tray, and the transport keys. Mark is the one
 /// orange key; End is charcoal with a red lamp and asks first.
+///
+/// On iPhone the recording also shows as a Live Activity on the lock screen and in the Dynamic Island
+/// (`RecordingLiveActivity`), whose Pause/Resume and Mark keys come back here as `RecordingCommand`s.
 struct RecordingView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -19,6 +22,7 @@ struct RecordingView: View {
     let meeting: Meeting
 
     @State private var recorder = AudioRecorder()
+    @State private var liveActivity = RecordingLiveActivity()
     @State private var startError: String?
     @State private var confirmingEnd = false
 
@@ -55,6 +59,22 @@ struct RecordingView: View {
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = false
             #endif
+            liveActivity.end()
+        }
+        .onChange(of: recorder.isPaused) { updateLiveActivity() }
+        .onChange(of: recorder.wasInterrupted) { updateLiveActivity() }
+        .onChange(of: meeting.motionMarks.count) { updateLiveActivity() }
+        .onReceive(NotificationCenter.default.publisher(for: .minitsRecordingCommand)) { note in
+            guard recorder.isRecording, let raw = note.object as? String, let command = RecordingCommand(rawValue: raw)
+            else { return }
+            switch command {
+            case .togglePause:
+                Task {
+                    if recorder.isPaused { await recorder.resume() } else { await recorder.pause() }
+                }
+            case .mark:
+                markMotion()
+            }
         }
         .confirmationDialog("End the meeting?", isPresented: $confirmingEnd, titleVisibility: .visible) {
             Button("End and make the transcript") { Task { await end() } }
@@ -243,6 +263,8 @@ struct RecordingView: View {
             #if os(iOS)
             UIApplication.shared.isIdleTimerDisabled = true
             #endif
+            liveActivity.start(title: meeting.title, kindName: meeting.kind.shortName, markName: markName,
+                               present: present.count, marks: meeting.motionMarks.count)
         } catch {
             startError = error.localizedDescription
         }
@@ -253,7 +275,13 @@ struct RecordingView: View {
         try? context.save()
     }
 
+    private func updateLiveActivity() {
+        liveActivity.update(isPaused: recorder.isPaused, wasInterrupted: recorder.wasInterrupted,
+                            elapsed: recorder.elapsed, marks: meeting.motionMarks.count)
+    }
+
     private func end() async {
+        liveActivity.end()
         meeting.durationSeconds = await recorder.stop()
         meeting.status = .processing
         try? context.save()

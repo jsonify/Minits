@@ -19,6 +19,8 @@ struct MinitsApp: App {
             }
             .environment(router)
             .tint(Color.sk1Ink)
+            // A recording the app didn't get to finish can't be resumed, so take its lock-screen REC away.
+            .task { RecordingLiveActivity.endLeftovers() }
             #if os(macOS)
             .frame(minWidth: 420, idealWidth: 480, minHeight: 640, idealHeight: 820)
             #endif

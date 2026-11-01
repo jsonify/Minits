@@ -37,6 +37,10 @@ targets:
         product: SK1Tokens
       - package: SK1Kit
         product: SK1UI
+      # The recording's Live Activity (iPhone only).
+      - target: MinitsRecordingWidget
+        embed: true
+        destinationFilters: [iOS]
     info:
       path: Minits/Info.plist
       properties:
@@ -46,6 +50,7 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         NSMicrophoneUsageDescription: Minits records your board meeting and each member's voice sample on this device so it can tell who is speaking.
         UIBackgroundModes: [audio]
+        NSSupportsLiveActivities: true
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
@@ -64,6 +69,42 @@ targets:
         ENABLE_PREVIEWS: YES
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Minits/Minits-macOS.entitlements
         "ENABLE_HARDENED_RUNTIME[sdk=macosx*]": YES
+
+  # The recording's Live Activity on the lock screen and in the Dynamic Island (iPhone). Embedded in the app on iOS.
+  # Its bundle ID is the app's plus ".recording", so a Config/Local.xcconfig bundle ID carries over to it.
+  MinitsRecordingWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - MinitsRecordingWidget
+      - Minits/LiveActivity/RecordingActivity.swift
+    dependencies:
+      - package: SK1Kit
+        product: SK1Tokens
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: MinitsRecordingWidget/Info.plist
+      properties:
+        CFBundleDisplayName: Minits
+        CFBundleShortVersionString: "0.1"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    settings:
+      base:
+        # $(inherited) here is the app's bundle ID from Signing.xcconfig (or your Local.xcconfig).
+        PRODUCT_BUNDLE_IDENTIFIER: $(inherited).recording
+        PRODUCT_NAME: MinitsRecordingWidget
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: YES
 
   # Unit tests for the evaluation scorer. Compiles Minits/Eval directly (no app host, no FluidAudio),
   # so they run fast on a Mac: xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'

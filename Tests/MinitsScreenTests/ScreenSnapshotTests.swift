@@ -18,7 +18,7 @@ final class ScreenSnapshotTests: XCTestCase {
         var modelsReady = true
         /// A sheet brings its own navigation bar; a pushed screen gets one here.
         var inNavigationStack = true
-        let view: (ScreenFixtures) -> AnyView
+        let view: @MainActor (ScreenFixtures) -> AnyView
     }
 
     private static let widths: [(name: String, width: CGFloat, height: CGFloat)] = [
@@ -60,12 +60,33 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "16-cassette-deck-playing") { f in
                 AnyView(CassetteDeckScreen(player: f.playingDeck, title: f.review.title, date: f.review.startedAt))
             },
+            Screen(name: "17-home-downloading-models", inNavigationStack: false) { _ in
+                AnyView(ScrollView {
+                    ModelSetupCard(
+                        preparing: true,
+                        progress: ModelDownloadProgress(model: .transcription, phase: .downloading(file: 2, of: 5),
+                                                        modelFraction: 0.4),
+                        error: nil) {}
+                        .padding(20)
+                })
+            },
+            Screen(name: "18-home-download-failed", inNavigationStack: false) { _ in
+                AnyView(ScrollView {
+                    ModelSetupCard(preparing: false, progress: nil,
+                                   error: "Download didn't finish: The Internet connection appears to be offline.") {}
+                        .padding(20)
+                })
+            },
+            Screen(name: "19-intro", inNavigationStack: false) { _ in AnyView(IntroView(mic: .undetermined) {}) },
+            Screen(name: "20-intro-mic-off", inNavigationStack: false) { _ in AnyView(IntroView(mic: .denied) {}) },
         ]
 
         for screen in screens {
             let container = screen.name == "01-home-empty" ? empty : fixtures.container
             UserDefaults.standard.set(screen.modelsReady, forKey: "modelsReady")
             UserDefaults.standard.set(screen.lastKind.rawValue, forKey: "lastMeetingKind")
+            // Home would put the first-run intro over itself; the intro has its own screens.
+            UserDefaults.standard.set(true, forKey: "hasSeenIntro")
             for size in Self.widths {
                 for dark in [false, true] {
                     let name = "\(screen.name)-\(size.name)-\(dark ? "dark" : "light")"
