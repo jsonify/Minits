@@ -2,257 +2,300 @@ import AVFoundation
 import Foundation
 import Observation
 
-/// Plays a whole meeting recording for the Transcript tab: play and pause, jump to a time or a line, skip back or
-/// forward, and change the speed. It reports where it's got to a few times a second, so the transcript can light the
-/// line being spoken.
+/// Plays a whole meeting recording for the Transcript tab's cassette deck: play, pause, stop, jump, volume and
+/// speed, with the position, the two meter levels and which transcript line is playing.
 ///
-/// The file isn't opened until the first play, so showing the Transcript tab costs nothing. Like `ClipPlayer`, the
-/// player and the audio session live on a background queue (`MeetingPlayerIO`), so switching the session to playback
-/// never stalls the main thread.
+/// Setting up the audio session can block for a moment, so that and opening the file happen on a background queue
+/// (as `ClipPlayer` does). The ready player is then handed to the main actor, which drives it and reads it about
+/// 30 times a second while it plays.
 @MainActor
 @Observable
 final class MeetingPlayer {
-    /// Speeds the speed key steps through.
-    static let rates: [Float] = [1, 1.5, 2]
+    enum State: Equatable { case stopped, playing, paused }
 
-    private(set) var isPlaying = false
-    /// Where playback is, in seconds from the start of the recording.
-    private(set) var currentTime: Double = 0
-    /// The recording's length once it's been opened; until then, nil (show the meeting's saved duration instead).
-    private(set) var duration: Double?
-    private(set) var rate: Float = 1
-    /// The recording couldn't be opened (it's missing or unreadable).
+    /// The transcript's lines as times, so the player can say which one is playing.
+    struct Mark: Equatable {
+        let id: UUID
+        let start: Double
+        let end: Double
+    }
+
+    private(set) var state: State = .stopped
+    /// Where playback is, in seconds.
+    private(set) var position: Double = 0
+    /// How long the recording is, in seconds. Until the file is opened, this is the meeting's own duration.
+    private(set) var duration: Double = 0
+    /// The two meters, from 0 (at rest) to 1 (full scale), with VU ballistics. For a mono file the first is the
+    /// average level and the second the peak; for a stereo file they're left and right.
+    private(set) var levels: (Float, Float) = (0, 0)
+    private(set) var isStereo = false
+    /// The line under the playhead once playback has started, else nil.
+    private(set) var currentLineID: UUID?
+    /// Set when the recording couldn't be opened.
     private(set) var failed = false
-    /// Whether anything has been played or picked yet, so nothing is lit before then.
-    private(set) var hasStarted = false
 
-    private let io = MeetingPlayerIO()
+    /// 0 to 1.
+    var volume: Float = 1 { didSet { player?.volume = volume } }
+    /// 0.5 to 2.
+    var rate: Float = 1 { didSet { player?.rate = rate } }
+
+    var marks: [Mark] = [] { didSet { updateCurrentLine() } }
+
+    var isPlaying: Bool { state == .playing }
+    /// How far through the recording, from 0 to 1.
+    var progress: Double { duration > 0 ? min(max(position / duration, 0), 1) : 0 }
+
     @ObservationIgnored private var url: URL?
-    @ObservationIgnored private var timer: Timer?
-    /// Bumped by every command, so a position reading that left before a command doesn't undo it.
-    @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var polling = false
+    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private var tick: Task<Void, Never>?
+    @ObservationIgnored private var opening = false
+    @ObservationIgnored private var pendingStart: Double?
+    @ObservationIgnored private let io = DeckIO()
 
-    /// The recording to play. Call before anything else; calling again with another file stops the first.
-    func load(url: URL) {
-        guard url != self.url else { return }
+    /// Points the deck at a recording, without opening it yet. `duration` shows until the file is opened.
+    func load(url: URL, duration: Double) {
+        guard self.url != url else { return }
         stop()
+        player = nil
         self.url = url
+        self.duration = max(duration, 0)
         failed = false
-        duration = nil
-        currentTime = 0
-        hasStarted = false
     }
 
-    func toggle() {
-        if isPlaying { pause() } else { play() }
-    }
+    // MARK: Transport
 
-    /// Plays from `time` (seconds), or from where it is.
-    func play(from time: Double? = nil) {
-        guard let url else { return }
-        if let time {
-            currentTime = clamp(time)
-        } else if let duration, currentTime >= duration - 0.5 {
-            currentTime = 0   // Finished: play again from the start.
+    /// Plays from where it is, or from `start` seconds.
+    func play(from start: Double? = nil) {
+        if let player {
+            if let start { player.currentTime = clamp(start) }
+            player.rate = rate
+            player.volume = volume
+            player.play()
+            setState(.playing)
+            return
         }
-        hasStarted = true
-        isPlaying = true
-        generation += 1
-        let token = generation
-        let from = currentTime
-        let rate = rate
-        Task {
-            let status = await io.play(url: url, from: from, rate: rate)
-            guard token == generation else { return }
-            if let status {
-                failed = false
-                apply(status)
-                startTimer()
-            } else {
-                failed = true
-                isPlaying = false
-                stopTimer()
-            }
-        }
+        open(thenPlayFrom: start ?? position)
     }
 
     func pause() {
-        isPlaying = false
-        stopTimer()
-        generation += 1
-        let token = generation
-        Task {
-            let status = await io.pause()
-            guard token == generation, let status else { return }
-            currentTime = status.time
+        guard state == .playing else { return }
+        player?.pause()
+        refresh()
+        setState(.paused)
+    }
+
+    /// PAUSE latches: pressed while playing it pauses; pressed again it plays.
+    func togglePause() {
+        switch state {
+        case .playing: pause()
+        case .paused: play()
+        case .stopped: break
         }
     }
 
-    /// Moves to `time` (seconds), playing on from there if it was playing.
-    func seek(to time: Double) {
-        currentTime = clamp(time)
-        hasStarted = true
-        generation += 1
-        let token = generation
-        let target = currentTime
-        Task {
-            let status = await io.seek(to: target)
-            guard token == generation, let status else { return }
-            apply(status)
-        }
-    }
-
-    func skip(by seconds: Double) {
-        seek(to: currentTime + seconds)
-    }
-
-    /// Steps to the next speed in `rates`, back to 1× after the last.
-    func cycleRate() {
-        let index = Self.rates.firstIndex(of: rate) ?? 0
-        rate = Self.rates[(index + 1) % Self.rates.count]
-        let rate = rate
-        Task { await io.setRate(rate) }
-    }
-
-    /// Stops and lets go of the file and the audio session.
+    /// Stops and rewinds to the start.
     func stop() {
-        stopTimer()
-        generation += 1
-        isPlaying = false
-        io.stop()
+        player?.stop()
+        player?.currentTime = 0
+        pendingStart = nil
+        position = 0
+        setState(.stopped)
+        updateCurrentLine()
     }
 
-    private func clamp(_ time: Double) -> Double {
-        let end = duration ?? .greatestFiniteMagnitude
-        return min(max(time, 0), max(end - 0.1, 0))
+    /// Jumps `seconds` (negative to go back), staying playing or paused.
+    func skip(_ seconds: Double) {
+        seek(to: position + seconds)
     }
 
-    private func apply(_ status: MeetingPlayerIO.Status) {
-        duration = status.duration
-        currentTime = status.time
-        if isPlaying, !status.playing {
-            // It reached the end. AVAudioPlayer goes back to 0 there; stay at the end so it reads as finished.
-            isPlaying = false
-            currentTime = status.duration
-            stopTimer()
+    func seek(to seconds: Double) {
+        let target = clamp(seconds)
+        player?.currentTime = target
+        if player == nil, opening { pendingStart = target }
+        position = target
+        if state == .stopped, target > 0 { setState(.paused) }
+        updateCurrentLine()
+    }
+
+    /// A line's play key: plays from just before the line, or pauses if that line is already playing.
+    func toggleLine(_ mark: Mark) {
+        if state == .playing, currentLineID == mark.id {
+            pause()
+        } else {
+            // A little lead-in helps you recognize the voice.
+            play(from: max(0, mark.start - 0.3))
         }
     }
 
-    // MARK: Position
+    /// Shows the deck mid-meeting without any audio, for the screenshot tests: at `position` of `duration`, in
+    /// `state`, with the meters at `levels`.
+    func stage(position: Double, duration: Double, state: State, levels: (Float, Float)) {
+        self.duration = duration
+        self.position = position
+        self.state = state
+        self.levels = levels
+        updateCurrentLine()
+    }
 
-    private func startTimer() {
-        stopTimer()
-        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak self] _ in
-            Task { @MainActor in await self?.tick() }
+    // MARK: Opening
+
+    private func open(thenPlayFrom start: Double) {
+        guard let url, !opening else {
+            pendingStart = start
+            return
         }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+        opening = true
+        pendingStart = start
+        io.open(url: url) { [weak self] box in
+            Task { @MainActor in self?.opened(box.player) }
+        }
     }
 
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
+    private func opened(_ newPlayer: AVAudioPlayer?) {
+        opening = false
+        guard let newPlayer else {
+            failed = true
+            setState(.stopped)
+            return
+        }
+        player = newPlayer
+        isStereo = newPlayer.numberOfChannels >= 2
+        if newPlayer.duration > 0 { duration = newPlayer.duration }
+        let start = clamp(pendingStart ?? position)
+        pendingStart = nil
+        newPlayer.currentTime = start
+        newPlayer.volume = volume
+        newPlayer.rate = rate
+        newPlayer.play()
+        position = start
+        setState(.playing)
     }
 
-    private func tick() async {
-        guard isPlaying, !polling else { return }
-        polling = true
-        defer { polling = false }
-        let token = generation
-        guard let status = await io.status(), token == generation, isPlaying else { return }
-        apply(status)
+    // MARK: Ticking
+
+    private func setState(_ new: State) {
+        if state != new { state = new }
+        if new == .playing {
+            startTicking()
+        } else if tick == nil, levels != (0, 0) {
+            // The meters still need to fall back to rest.
+            startTicking()
+        }
+    }
+
+    private func startTicking() {
+        guard tick == nil else { return }
+        tick = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(33))
+                guard let self, self.step() else { break }
+            }
+            self?.tick = nil
+        }
+    }
+
+    /// One tick: reads the position and the meters. Returns whether to keep ticking.
+    private func step() -> Bool {
+        if state == .playing {
+            if let player, !player.isPlaying {
+                // It reached the end.
+                position = duration
+                setState(.paused)
+            } else {
+                refresh()
+            }
+        }
+        var targets: (Float, Float) = (0, 0)
+        if state == .playing, let player {
+            player.updateMeters()
+            if isStereo {
+                targets = (Self.meterLevel(player.averagePower(forChannel: 0)),
+                           Self.meterLevel(player.averagePower(forChannel: 1)))
+            } else {
+                targets = (Self.meterLevel(player.averagePower(forChannel: 0)),
+                           Self.meterLevel(player.peakPower(forChannel: 0)))
+            }
+        }
+        let next = (Self.ease(levels.0, to: targets.0), Self.ease(levels.1, to: targets.1))
+        if next != levels { levels = next }
+        return state == .playing || levels != (0, 0)
+    }
+
+    private func refresh() {
+        guard let player else { return }
+        let now = player.currentTime
+        if abs(now - position) > 0.001 { position = now }
+        updateCurrentLine()
+    }
+
+    private func updateCurrentLine() {
+        let id: UUID?
+        if state == .stopped {
+            id = nil
+        } else {
+            id = marks.last { position >= $0.start - 0.35 && position < $0.end }?.id
+        }
+        if id != currentLineID { currentLineID = id }
+    }
+
+    private func clamp(_ seconds: Double) -> Double {
+        min(max(seconds, 0), max(duration - 0.05, 0))
+    }
+
+    // MARK: Meter maths
+
+    /// A meter's level (0 to 1 across the scale) for a power in dBFS. 0 VU is set at -18 dBFS, so ordinary speech
+    /// sits just below 0; the scale runs from -20 VU to +3 VU and is linear in amplitude, as a real VU meter's is.
+    nonisolated static func meterLevel(_ dbfs: Float) -> Float {
+        let vu = dbfs + 18
+        return VUScale.fraction(vu: vu)
+    }
+
+    /// VU ballistics at 30 ticks a second: about 300 ms to reach a new level, falling back a little slower.
+    nonisolated static func ease(_ current: Float, to target: Float) -> Float {
+        let next = current + (target - current) * (target > current ? 0.3 : 0.18)
+        return abs(next - target) < 0.002 ? target : next
     }
 }
 
-/// The `AVAudioPlayer` and the audio session, used only on one serial background queue. Each call waits for its
-/// work, so calls run in the order they're made.
-private final class MeetingPlayerIO: @unchecked Sendable {
-    struct Status: Sendable {
-        let time: Double
-        let duration: Double
-        let playing: Bool
+/// Where a VU reading falls across the meter's scale, from 0 at -20 VU to 1 at +3 VU. The scale is linear in
+/// amplitude, so 0 VU sits about 70% across, as on a real meter.
+enum VUScale {
+    static let lowest: Float = -20
+    static let highest: Float = 3
+
+    static func fraction(vu: Float) -> Float {
+        let lo = amplitude(lowest), hi = amplitude(highest)
+        guard vu > lowest else { return 0 }
+        return min(max((amplitude(vu) - lo) / (hi - lo), 0), 1)
     }
 
-    private let queue = DispatchQueue(label: "com.jsonify.minits.meeting-player", qos: .userInitiated)
-    /// Only touched on `queue`.
-    private var player: AVAudioPlayer?
-    private var url: URL?
+    private static func amplitude(_ vu: Float) -> Float { powf(10, vu / 20) }
+}
 
-    /// Opens `url` if it isn't open yet and plays it from `from`; nil if it can't be opened.
-    func play(url: URL, from: Double, rate: Float) async -> Status? {
-        await run {
+/// Carries a player across from the background queue.
+private struct PlayerBox: @unchecked Sendable { let player: AVAudioPlayer? }
+
+/// Sets up the audio session and opens the file on a serial background queue.
+private final class DeckIO: @unchecked Sendable {
+    private let queue = DispatchQueue(label: "com.jsonify.minits.deck", qos: .userInitiated)
+
+    func open(url: URL, done: @escaping @Sendable (PlayerBox) -> Void) {
+        queue.async {
             #if os(iOS)
             // Set every time: recording switches the session to .record.
             let session = AVAudioSession.sharedInstance()
             try? session.setCategory(.playback, mode: .spokenAudio)
             try? session.setActive(true)
             #endif
-            if self.player == nil || self.url != url {
-                self.player?.stop()
-                guard let player = try? AVAudioPlayer(contentsOf: url) else {
-                    self.player = nil
-                    self.url = nil
-                    return nil
-                }
-                player.enableRate = true
-                player.prepareToPlay()
-                self.player = player
-                self.url = url
+            guard let player = try? AVAudioPlayer(contentsOf: url) else {
+                done(PlayerBox(player: nil))
+                return
             }
-            guard let player = self.player else { return nil }
-            player.rate = rate
-            player.currentTime = min(max(from, 0), player.duration)
-            player.play()
-            return Self.status(of: player)
-        }
-    }
-
-    func pause() async -> Status? {
-        await run {
-            guard let player = self.player else { return nil }
-            player.pause()
-            return Self.status(of: player)
-        }
-    }
-
-    func seek(to time: Double) async -> Status? {
-        await run {
-            guard let player = self.player else { return nil }
-            player.currentTime = min(max(time, 0), player.duration)
-            return Self.status(of: player)
-        }
-    }
-
-    func setRate(_ rate: Float) async {
-        _ = await run { self.player?.rate = rate }
-    }
-
-    func status() async -> Status? {
-        await run { self.player.map(Self.status(of:)) }
-    }
-
-    func stop() {
-        queue.async {
-            let wasOpen = self.player != nil
-            self.player?.stop()
-            self.player = nil
-            self.url = nil
-            #if os(iOS)
-            if wasOpen { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
-            #else
-            _ = wasOpen
-            #endif
-        }
-    }
-
-    private static func status(of player: AVAudioPlayer) -> Status {
-        Status(time: player.currentTime, duration: player.duration, playing: player.isPlaying)
-    }
-
-    private func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await withCheckedContinuation { continuation in
-            queue.async { continuation.resume(returning: work()) }
+            player.enableRate = true
+            player.isMeteringEnabled = true
+            player.prepareToPlay()
+            done(PlayerBox(player: player))
         }
     }
 }

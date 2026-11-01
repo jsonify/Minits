@@ -12,9 +12,7 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
    **On the lock screen (iPhone).** While it records, a Live Activity shows on the lock screen and in the Dynamic Island. On the lock screen it's an olive LCD with the red REC lamp (PAUSED or INTERRUPTED when paused), the kind of meeting and how many are here, the elapsed time, how many motions or moments are marked and the meeting's name, with a **Pause/Resume** key and the orange **Mark motion** (or **Mark moment**) key under it. Both keys work without unlocking. The Dynamic Island shows the lamp and the time; touch and hold it for the keys. Tap anywhere else to open Minits. It goes away when the meeting ends, and at the next launch if the app was closed mid-meeting. Turn it off in Settings › Minits › Live Activities.
 4. **Who said what.** After the meeting, FluidAudio splits the recording by voice, matches each voice to a saved voiceprint, and transcribes it (Parakeet, English). While it works, an LCD shows a blinking WORKING lamp, the current step, how far along it is as a percentage and a bar of cells. If it fails, a red lamp shows the error and the orange **Try again** key starts over; the recording is kept. When it's done, a segmented control switches between **Review** (with how many lines need a look, e.g. `REVIEW · 3`), **Transcript** and **Minutes** or **Summary**.
-5. **Review.** Lines the app isn't sure about are flagged. An LCD shows how many are left to check. Each line is a tray with the speaker, its time on an LCD chip and a play key; a flagged line has an amber lamp with the reason and its choices as keys, the current guess lit with the orange bar. Play the line, tap the right name, or **Someone else…** for the full list. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines. The Transcript tab shows every line, with **Motions only** and **Follow** toggles and a **Share** key.
-
-   **Listening back.** A player bar sits under the transcript: an LCD with a lamp (READY, PLAYING, PAUSED, or NO RECORDING if the file isn't on the device), who's speaking, the time and the length, and a scrubber of LCD cells with a tick at each marked motion or moment. Drag or tap along it to jump. Under it are keys to go back 15 seconds, **Play/Pause** (orange), go forward 15 seconds, and a speed key that steps through 1×, 1.5× and 2×. A line's play key plays the recording on from that line (tap it again to pause). The line being spoken gets a teal lamp, and with **Follow** on (the default) the transcript scrolls to keep it in view. On iPhone it keeps playing with the screen locked. With VoiceOver, swipe up or down on the scrubber to skip 15 seconds. In Review, the play key still plays just that line.
+5. **Review.** Lines the app isn't sure about are flagged. An LCD shows how many are left to check. Each line is a tray with the speaker, its time on an LCD chip and a play key; a flagged line has an amber lamp with the reason and its choices as keys, the current guess lit with the orange bar. Play the line, tap the right name, or **Someone else…** for the full list. Unknown voices show as Guest 1, Guest 2… and can be named once for all their lines. The Transcript tab shows every line, with a **Motions only** toggle and a **Share** key, under a cassette deck that plays the whole meeting (see **Transcript playback**).
 6. **Minutes or summary.** On iOS 26 / macOS 26 with Apple Intelligence, the write-up is drafted on-device:
    - *Board meeting:* formal minutes (attendance, discussion, motions with mover/seconder/vote, action items).
    - *Ad-hoc meeting:* a summary (what it was about, topics discussed, decisions, action items, open questions).
@@ -25,13 +23,20 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
    **PDF** makes a plain, printable PDF (black on white, not the SK-1 look) named after the meeting, e.g. `October Board Meeting.pdf`: the meeting's title and date, for a board meeting the attendance (members here and absent, with their roles), then the minutes or summary as edited, with Markdown headings (`#`, `**Bold line**`, ALL-CAPS lines and the section names the drafts use) and bulleted or numbered lists kept, and *Page 1 of 3* at the foot of each page. Pages break between lines and never end on a heading. Paper is US Letter in regions that use US measurements, A4 elsewhere. On iPhone it opens the share sheet (Save to Files, Mail, AirDrop, Print…); on Mac it opens a save panel. It's made on the device, with no network.
 
+**Transcript playback.** The Transcript tab has a 1970s-style cassette deck pinned above the lines. The meeting is a cassette in a smoky window, between the VOLUME and SPEED knobs, with its title and date handwritten on the index label, SIDE A and a tape length (C30 to C120, the shortest the meeting fits on one side of). While it plays, the reels turn and the tape winds from the left reel to the right, so you can see how far in you are. With Reduce Motion the reels stay still, but the tape still moves across. The **VOLUME** knob (0 to 10) sits to the left of the cassette and the **SPEED** knob (0.75×, 1×, 1.25×, 1.5×, 2×) to the right. Drag up or down to turn a knob; with VoiceOver, swipe up or down. Under the cassette:
+- Two backlit VU meters. Recordings are mono, so they show **AVG** (average level) and **PEAK**; a stereo file would show LEFT and RIGHT.
+- Piano keys: **STOP** (stops and rewinds to the start), **◀◀** and **▶▶** (10 seconds back or forward), **PLAY** and **PAUSE**. PLAY and PAUSE stay down while they're on.
+- A tape counter showing the position and the length.
+
+The line being played has a lit orange lamp, and the list scrolls to follow it. A line's play key plays the deck from just before that line; tap it again to pause. The deck stops when you leave the tab. The Review tab still plays one line at a time.
+
 **Renaming or deleting a meeting.** On a meeting's screen, the **Edit** menu (top right) has **Rename…** and **Delete meeting…**. On Home, touch and hold (right-click on Mac) a past meeting for the same two. Rename opens an LCD text field. Delete asks first, then removes the recording, transcript and write-up from the device; from the meeting's screen it also goes back to Home. Neither is offered while a meeting is recording or processing.
 
 The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline. Until they're on the device, Home shows a **One-time setup** tray with a **Download now** key. While it downloads, an LCD there shows a blinking DOWNLOADING lamp, which model and step it's on (e.g. `TRANSCRIPTION MODEL · FILE 3 OF 5`, then `SETTING UP TRANSCRIPTION MODEL`), how far along the whole download is as a percentage, and a bar of cells. On iPhone the screen stays on until it's done. If it fails, a red lamp shows why and the key reads **Try again**.
 
 ## Look
 
-Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.3.0 or later). It follows the system's Light or Dark Mode. Every screen is built from SK1Kit's components. The only colours of Minits' own are the member avatars (SK-1 has none for people), in `UI/Shared.swift`.
+Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.3.0 or later). It follows the system's Light or Dark Mode. Every screen is built from SK1Kit's components. The only colours of Minits' own are the member avatars (SK-1 has none for people), in `UI/Shared.swift`, and the transcript's cassette deck (`UI/CassetteDeck.swift`): the cassette and the warm VU meter faces are drawn as physical objects, so they look the same in Light and Dark Mode, apart from the meters' backlight dimming as the LCD's does. The deck's knobs use SK1Kit's knob maths (`SK1.KnobScale`).
 
 ## Build it (Mac, free Apple ID is fine)
 
@@ -68,7 +73,8 @@ Config/Signing.xcconfig     App bundle ID and team defaults; includes your gitig
 Minits/
   MinitsApp.swift           App entry, navigation
   Models/Models.swift       SwiftData: Member, Meeting, TranscriptLine
-  Audio/                    16 kHz mono WAV recorder, clip playback (Review), whole-meeting player (Transcript)
+  Audio/                    16 kHz mono WAV recorder, clip playback
+  Audio/MeetingPlayer.swift Whole-meeting playback for the cassette deck: transport, volume, speed, meters, current line
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
   Export/MinutesPDF.swift   The minutes or summary as a printable PDF (Core Text; reads the draft's Markdown, paginates)
@@ -76,8 +82,8 @@ Minits/
 MinitsRecordingWidget/      Widget extension (iOS): draws the recording's Live Activity on the lock screen and in the Dynamic Island
   UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
   UI/MeetingTitleSheet.swift Rename a meeting (from Home and the meeting screen)
+  UI/CassetteDeck.swift     The transcript's cassette deck: cassette and reels, VU meters, knobs, piano-key transport, counter
   UI/IntroView.swift        The first-run intro: how it works, on this device, the consent reminder, the microphone
-  UI/TranscriptPlayerBar.swift The player under the transcript: LCD, scrubber with marks, transport and speed keys
   UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
@@ -100,7 +106,7 @@ CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme 
 
 ### Screenshots
 
-`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with its player bar), a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, the transcript player paused partway with a speaker showing, Home's model download tray (downloading, and failed), and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
+`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with the cassette deck at rest), the cassette deck mid-meeting while it plays, a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, Home's model download tray (downloading, and failed), and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
 
 - **On a PR:** open the CI run's Summary page and download the `minits-screens` artifact (PNGs at 2x, named like `10-review-iphone-dark.png`).
 - **Locally:** run the command above. With `MINITS_SNAPSHOT_DIR` set (on the command line, as `TEST_RUNNER_MINITS_SNAPSHOT_DIR`, or in the scheme's environment) the PNGs are written there. Either way they're attached to the test results in Xcode's Report navigator.

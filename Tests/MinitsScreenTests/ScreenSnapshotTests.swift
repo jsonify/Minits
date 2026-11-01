@@ -57,17 +57,8 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "15-rename-meeting", inNavigationStack: false) { f in
                 AnyView(MeetingTitleSheet(title: f.minutes.title) { _ in })
             },
-            Screen(name: "16-transcript-player-paused", inNavigationStack: false) { f in
-                // Seeking before anything is opened sets the position without a recording: PAUSED at 20:04. The bar
-                // brings its own chassis; above it is the window's background.
-                let player = MeetingPlayer()
-                player.seek(to: 1_204)
-                return AnyView(VStack(spacing: 0) {
-                    Spacer()
-                    TranscriptPlayerBar(player: player, savedDuration: f.review.durationSeconds,
-                                        marks: f.review.motionMarks, markName: f.review.kind.markName,
-                                        speaker: f.members[1].name)
-                })
+            Screen(name: "16-cassette-deck-playing") { f in
+                AnyView(CassetteDeckScreen(player: f.playingDeck, title: f.review.title, date: f.review.startedAt))
             },
             Screen(name: "17-home-downloading-models", inNavigationStack: false) { _ in
                 AnyView(ScrollView {
