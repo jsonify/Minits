@@ -12,8 +12,8 @@ import AppKit
 /// Screen A4: the drafted minutes (board meeting) or summary (ad-hoc meeting), editable and shareable.
 ///
 /// SK-1 look: before a draft, what will happen, any lines still to check (amber lamp) and the orange key that drafts
-/// it, with an LCD readout while it works. After, a teal DRAFT lamp and a Redraft key, the text in a sunken tray, and
-/// the Copy, PDF and orange Share keys.
+/// it, with the working LCD (`WorkingLCD`) in place of the key while it works. After, a teal DRAFT lamp and a Redraft
+/// key, the text in a sunken tray, and the Copy, PDF and orange Share keys.
 struct MinutesView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
@@ -21,7 +21,7 @@ struct MinutesView: View {
     let members: [Member]
 
     @State private var working = false
-    @State private var progressText = ""
+    @State private var progress = MinutesView.startingProgress
     @State private var errorText: String?
     @State private var confirmingRedo = false
     #if os(macOS)
@@ -56,17 +56,31 @@ struct MinutesView: View {
                     note(.danger, "Error", errorText)
                 }
                 if working {
-                    SKReadout(progressText.isEmpty ? "WORKING…" : progressText.uppercased())
+                    workingLCD
+                } else {
+                    Button {
+                        Task { await draft() }
+                    } label: {
+                        Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
+                    }
+                    .buttonStyle(.sk1Key(.orange, size: .large))
                 }
-                Button {
-                    Task { await draft() }
-                } label: {
-                    Text(MinutesWriter.aiAvailable ? (meeting.kind == .board ? "Draft the minutes" : "Write the summary") : "Make an outline")
-                }
-                .buttonStyle(.sk1Key(.orange, size: .large))
-                .disabled(working)
             }
             .padding(20)
+        }
+    }
+
+    /// What the working readout shows before the writer reports its first step.
+    private static let startingProgress = DraftProgress(label: "Getting started", step: 1, stepCount: 1,
+                                                        fraction: 0.02, ceiling: 0.05)
+
+    private var workingLCD: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            WorkingLCD(label: progress.label, step: progress.step, stepCount: progress.stepCount,
+                       fraction: progress.fraction, ceiling: progress.ceiling, tau: 25)
+            Text("Apple Intelligence is working on this device. Keep this screen open; a long meeting can take a minute or two.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -120,7 +134,7 @@ struct MinutesView: View {
             }
 
             if working {
-                SKReadout(progressText.isEmpty ? "WORKING…" : progressText.uppercased())
+                workingLCD
             }
 
             HStack(spacing: 10) {
@@ -177,7 +191,7 @@ struct MinutesView: View {
     private func draft() async {
         working = true
         errorText = nil
-        progressText = ""
+        progress = Self.startingProgress
         let byID = Dictionary(uniqueKeysWithValues: members.map { ($0.id, $0) })
         let input = MinutesInput(
             kind: meeting.kind,
@@ -188,8 +202,8 @@ struct MinutesView: View {
             lines: meeting.sortedLines.map { .init(time: $0.start, speaker: $0.speakerName, text: $0.text) },
             motionMarks: meeting.motionMarks)
         do {
-            let text = try await MinutesWriter.draft(input) { message in
-                Task { @MainActor in progressText = message }
+            let text = try await MinutesWriter.draft(input) { update in
+                Task { @MainActor in progress = update }
             }
             meeting.minutes = text
             try? context.save()

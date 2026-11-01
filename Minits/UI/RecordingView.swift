@@ -10,7 +10,7 @@ import UIKit
 ///
 /// SK-1 look: the meeting's title, one big LCD (REC lamp, kind and head count, the elapsed time in seven-segment
 /// digits, the input level), notes, the marks as LCD chips in a sunken tray, and the transport keys. Mark is the one
-/// orange key; End is charcoal with a red lamp and asks first.
+/// orange key; End is charcoal with a red lamp and asks first, in an SK-1 sheet (`ConfirmSheet`).
 ///
 /// On iPhone the recording also shows as a Live Activity on the lock screen and in the Dynamic Island
 /// (`RecordingLiveActivity`), whose Pause/Resume and Mark keys come back here as `RecordingCommand`s.
@@ -76,12 +76,24 @@ struct RecordingView: View {
                 markMotion()
             }
         }
-        .confirmationDialog("End the meeting?", isPresented: $confirmingEnd, titleVisibility: .visible) {
-            Button("End and make the transcript") { Task { await end() } }
-            Button("Keep recording", role: .cancel) {}
-        } message: {
-            Text("Minits will stop recording and start working out who said what.")
+        .confirmSheet(
+            isPresented: $confirmingEnd,
+            title: "End the meeting?",
+            message: "Minits will stop recording and start working out who said what. You can't add to this recording afterwards.",
+            readout: endReadout,
+            confirmTitle: "End and make the transcript",
+            tone: .stop,
+            cancelTitle: "Keep recording"
+        ) {
+            Task { await end() }
         }
+    }
+
+    /// What's been recorded, on the End sheet's LCD: "01:13 RECORDED · 2 MOMENTS".
+    private var endReadout: String {
+        let count = meeting.motionMarks.count
+        let marks = count == 0 ? "NO \(markName.uppercased())S" : "\(count) \(markName.uppercased())\(count == 1 ? "" : "S")"
+        return "\(SK1.Format.elapsed(recorder.elapsed)) RECORDED · \(marks)"
     }
 
     private var present: [Member] { members.filter { meeting.attendeeIDs.contains($0.id) } }

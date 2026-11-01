@@ -8,8 +8,8 @@ import UIKit
 
 /// After the meeting: processing, then Review (A3), Transcript and Minutes or Summary (A4).
 ///
-/// SK-1 look: while processing, an LCD with a blinking WORKING lamp, the stage, how far along it is in seven-segment
-/// digits and a bar of LCD cells. If processing fails, a red lamp and the error in a sunken tray, and an orange Try
+/// SK-1 look: while processing, the working LCD (`WorkingLCD`): a blinking WORKING lamp and the step, how far along it
+/// is in seven-segment digits, a playful word and the elapsed time, and a bar of LCD cells. If processing fails, a red lamp and the error in a sunken tray, and an orange Try
 /// again key. Once done, the tabs are an SK-1 segmented control, Review carrying how many lines need a look.
 struct MeetingView: View {
     @Environment(Router.self) private var router
@@ -141,46 +141,8 @@ struct MeetingView: View {
     }
 
     private var processingLCD: some View {
-        let ink = Color(sk1Hex: SK1.lcdInk)
-        let percent = Int((stage.fraction * 100).rounded())
-        return SKLCD {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 6) {
-                    SKLamp(color: .teal, lit: true, glow: 4, size: 7, label: "Working", blinking: true)
-                    Text("WORKING")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(1)
-                    Spacer(minLength: 8)
-                    Text("ON THIS DEVICE")
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1)
-                        .lineLimit(1)
-                }
-
-                HStack(alignment: .bottom, spacing: 12) {
-                    Text(stage.label.uppercased())
-                        .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .tracking(0.5)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    HStack(alignment: .bottom, spacing: 3) {
-                        SKSevenSegment("\(percent)", digitHeight: 30, spacing: 4)
-                            .shadow(color: ink.opacity(0.15), radius: 0, x: 1, y: 1)
-                        Text("%")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    }
-                }
-
-                ProgressCells(fraction: stage.fraction)
-            }
-            .foregroundStyle(ink)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-        }
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Working: \(stage.label)"))
-        .accessibilityValue(Text("\(percent) percent"))
+        WorkingLCD(label: stage.label, step: stage.step, stepCount: ProcessingStage.stepCount,
+                   fraction: stage.fraction, ceiling: stage.ceiling, tau: 45)
     }
 
     private var failedView: some View {
