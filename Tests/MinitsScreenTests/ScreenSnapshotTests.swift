@@ -57,12 +57,16 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "15-rename-meeting", inNavigationStack: false) { f in
                 AnyView(MeetingTitleSheet(title: f.minutes.title) { _ in })
             },
+            Screen(name: "19-intro", inNavigationStack: false) { _ in AnyView(IntroView(mic: .undetermined) {}) },
+            Screen(name: "20-intro-mic-off", inNavigationStack: false) { _ in AnyView(IntroView(mic: .denied) {}) },
         ]
 
         for screen in screens {
             let container = screen.name == "01-home-empty" ? empty : fixtures.container
             UserDefaults.standard.set(screen.modelsReady, forKey: "modelsReady")
             UserDefaults.standard.set(screen.lastKind.rawValue, forKey: "lastMeetingKind")
+            // Home would put the first-run intro over itself; the intro has its own screens.
+            UserDefaults.standard.set(true, forKey: "hasSeenIntro")
             for size in Self.widths {
                 for dark in [false, true] {
                     let name = "\(screen.name)-\(size.name)-\(dark ? "dark" : "light")"
