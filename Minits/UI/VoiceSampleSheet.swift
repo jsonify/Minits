@@ -16,6 +16,9 @@ struct VoiceSampleSheet: View {
 
     let member: Member
     let others: [Member]
+    /// Which meeting this voice is being learned for; nil from the People screen. Board meetings get the board line
+    /// to read; anything else gets an everyday one.
+    var kind: MeetingKind?
 
     @State private var recorder = AudioRecorder()
     @State private var phase: Phase = .ready
@@ -133,11 +136,19 @@ struct VoiceSampleSheet: View {
 
     // MARK: - Script
 
+    /// The line to read, in quotes.
+    private var scriptLine: String {
+        if kind == .board {
+            return "“Hi, I'm \(member.name)\(member.role.isEmpty ? "" : ", the board's \(member.role.lowercased())"). I've been on the board for a while and I'm here for tonight's meeting.”"
+        }
+        return "“Hi, I'm \(member.name). I'm just saying a few words so Minits knows how I sound when I'm talking at the table.”"
+    }
+
     private var script: some View {
         VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
             SKCaption("Say something like")
             SKWell {
-                Text("“Hi, I'm \(member.name)\(member.role.isEmpty ? "" : ", the board's \(member.role.lowercased())"). I've been on the board for a while and I'm here for tonight's meeting.”")
+                Text(scriptLine)
                     .font(.system(size: 17))
                     .italic()
                     .foregroundStyle(Color(sk1Hex: palette.ink))

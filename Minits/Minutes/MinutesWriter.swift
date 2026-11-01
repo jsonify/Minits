@@ -27,6 +27,30 @@ struct MinutesInput: Sendable {
     }
 }
 
+/// How far a draft has got, for the working readout: the step on screen, which of how many it is, how far along the
+/// whole draft is, and where this step ends (the readout creeps toward it, since the model reports nothing while it
+/// writes).
+struct DraftProgress: Sendable, Equatable {
+    let label: String
+    let step: Int
+    let stepCount: Int
+    let fraction: Double
+    let ceiling: Double
+
+    /// Reading part `index` (0-based) of `parts`, then writing. Reading shares 5–55%; writing takes the rest.
+    static func reading(part index: Int, of parts: Int) -> DraftProgress {
+        let share = 0.5 / Double(max(parts, 1))
+        let start = 0.05 + share * Double(index)
+        return DraftProgress(label: "Reading part \(index + 1) of \(parts)", step: index + 1, stepCount: parts + 1,
+                             fraction: start, ceiling: start + share)
+    }
+
+    static func writing(_ kind: MeetingKind, afterParts parts: Int) -> DraftProgress {
+        DraftProgress(label: kind == .board ? "Writing the minutes" : "Writing the summary", step: parts + 1,
+                      stepCount: parts + 1, fraction: 0.55, ceiling: 0.97)
+    }
+}
+
 /// Drafts minutes (board meetings) or a summary (ad-hoc meetings) on-device. Uses Apple Intelligence
 /// (Foundation Models, iOS 26 / macOS 26) when the device supports it; otherwise builds an outline
 /// from the transcript for you to finish.
@@ -57,7 +81,7 @@ enum MinutesWriter {
         return "Automatic writing needs iOS 26 or macOS 26 with Apple Intelligence, so you'll get an outline built from the transcript."
     }
 
-    static func draft(_ input: MinutesInput, progress: @escaping @Sendable (String) -> Void) async throws -> String {
+    static func draft(_ input: MinutesInput, progress: @escaping @Sendable (DraftProgress) -> Void) async throws -> String {
         #if canImport(FoundationModels)
         // With no speech there is nothing for the model to read; the outline says so plainly.
         if #available(iOS 26.0, macOS 26.0, *), aiAvailable, !input.lines.isEmpty {
@@ -72,14 +96,14 @@ enum MinutesWriter {
     #if canImport(FoundationModels)
     @available(iOS 26.0, macOS 26.0, *)
     private static func draftWithAppleIntelligence(
-        _ input: MinutesInput, progress: @escaping @Sendable (String) -> Void
+        _ input: MinutesInput, progress: @escaping @Sendable (DraftProgress) -> Void
     ) async throws -> String {
         // The on-device model has a small context window, so read the meeting in pieces,
         // take notes on each, then write the minutes from the notes.
         let chunks = chunk(input.lines, maxCharacters: 6_000)
         var notes: [String] = []
         for (index, piece) in chunks.enumerated() {
-            progress("Reading part \(index + 1) of \(chunks.count)")
+            progress(.reading(part: index, of: chunks.count))
             let session = LanguageModelSession(instructions: Prompts.notes(for: input.kind))
             let text = piece.map { "[\($0.time.clock)] \($0.speaker): \($0.text)" }.joined(separator: "\n")
             let marks = input.motionMarks
@@ -90,7 +114,7 @@ enum MinutesWriter {
             notes.append(response.content)
         }
 
-        progress(input.kind == .board ? "Writing the minutes" : "Writing the summary")
+        progress(.writing(input.kind, afterParts: chunks.count))
         let session = LanguageModelSession(instructions: Prompts.document(for: input.kind))
         let prompt = """
             Meeting: \(input.title)
