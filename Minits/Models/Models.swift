@@ -11,6 +11,9 @@ final class Member {
     var voiceprint: Data?
     var voiceSavedAt: Date?
     var sortOrder: Int = 0
+    /// Which avatar colour the member has, kept so removing someone doesn't recolour everyone after them.
+    /// nil for members saved before colours were stored, until `Member.fillInColors` gives them the one they had.
+    var colorIndex: Int?
 
     init(name: String, role: String, sortOrder: Int = 0) {
         self.id = UUID()
@@ -30,6 +33,45 @@ final class Member {
         let parts = name.split(separator: " ").prefix(2)
         let letters = parts.compactMap { $0.first }.map(String.init).joined()
         return letters.isEmpty ? "?" : letters.uppercased()
+    }
+}
+
+extension Member {
+    /// How many avatar colours there are.
+    static let colorCount = 7
+
+    /// The first colour no one has, or else the one fewest have.
+    static func nextColor(among members: [Member]) -> Int {
+        let used = members.compactMap(\.colorIndex).map { $0 % colorCount }
+        return (0..<colorCount).min { a, b in
+            used.filter { $0 == a }.count < used.filter { $0 == b }.count
+        } ?? 0
+    }
+
+    /// Gives members saved before colours were stored the colour their place in the list gave them, so nothing
+    /// changes on screen. `members` in list order. Returns whether any changed.
+    @discardableResult
+    static func fillInColors(_ members: [Member]) -> Bool {
+        var changed = false
+        for (index, member) in members.enumerated() where member.colorIndex == nil {
+            member.colorIndex = index % colorCount
+            changed = true
+        }
+        return changed
+    }
+
+    /// Changes the name and role. The voiceprint stays. With `updatingTranscripts`, every line already attributed to
+    /// this member takes the new name too; written minutes and summaries keep the old one until they're redrafted.
+    func update(name: String, role: String, updatingTranscripts: Bool, in context: ModelContext) {
+        if updatingTranscripts, name != self.name {
+            let speaker: UUID? = id
+            let lines = (try? context.fetch(FetchDescriptor<TranscriptLine>(
+                predicate: #Predicate { $0.speakerID == speaker }))) ?? []
+            for line in lines { line.speakerName = name }
+        }
+        self.name = name
+        self.role = role
+        try? context.save()
     }
 }
 
@@ -112,6 +154,13 @@ final class Meeting {
     var audioURL: URL { Storage.recordingsFolder.appendingPathComponent(audioFileName) }
 
     var sortedLines: [TranscriptLine] { lines.sorted { $0.start < $1.start } }
+
+    /// Deletes the meeting with its transcript and its recording.
+    func delete(from context: ModelContext) {
+        try? FileManager.default.removeItem(at: audioURL)
+        context.delete(self)
+        try? context.save()
+    }
     var linesNeedingReview: [TranscriptLine] { sortedLines.filter { $0.needsReview } }
 }
 

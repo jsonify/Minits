@@ -300,8 +300,8 @@ private struct LineCard: View {
     }
 
     private var colorIndex: Int? {
-        guard let id = line.speakerID else { return nil }
-        return members.firstIndex { $0.id == id }
+        guard let id = line.speakerID, let index = members.firstIndex(where: { $0.id == id }) else { return nil }
+        return members[index].colorIndex ?? index
     }
 
     private var initials: String {
