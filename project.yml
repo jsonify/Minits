@@ -67,6 +67,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_PREVIEWS: YES
+        # Minits/Assets.xcassets/AppIcon: the recording LCD, light and dark on iOS (drawn by Tools/app-icon).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": Minits/Minits-macOS.entitlements
         "ENABLE_HARDENED_RUNTIME[sdk=macosx*]": YES
 

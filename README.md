@@ -38,6 +38,12 @@ The voice and transcription models download once on first use (a few hundred MB,
 
 Minits uses the SK-1 look (cream chassis, sunken trays, raised keys, olive LCD, orange only for the main action) from [SK1Kit](https://github.com/jsonify/SK1Kit), a Swift package shared with Skreener (`SK1Tokens` and `SK1UI`, version 0.3.0 or later). It follows the system's Light or Dark Mode. Every screen is built from SK1Kit's components. The only colours of Minits' own are the member avatars (SK-1 has none for people), in `UI/Shared.swift`, and the transcript's cassette deck (`UI/CassetteDeck.swift`): the cassette and the warm VU meter faces are drawn as physical objects, so they look the same in Light and Dark Mode, apart from the meters' backlight dimming as the LCD's does. The deck's knobs use SK1Kit's knob maths (`SK1.KnobScale`).
 
+**App icon.** The icon is the recording screen in miniature: the olive LCD in its sunken bezel with a red REC lamp and the input level as a waveform, over Pause, the orange Mark key and End. On iOS 18 and later it has a Dark Mode version on the charcoal chassis (dark keys, LCD dimmed as in the app), which the home screen uses when it's set to dark icons. The Mac icon follows the macOS icon grid (a rounded square with a margin and shadow). It's drawn as SVG by `Tools/app-icon/make_icon.py` from SK1Kit's colours, and `Tools/app-icon/render.js` renders the PNGs in `Minits/Assets.xcassets/AppIcon.appiconset` (needs Python 3, Node and Playwright with Chromium):
+
+```bash
+python3 Tools/app-icon/make_icon.py && node Tools/app-icon/render.js
+```
+
 ## Build it (Mac, free Apple ID is fine)
 
 Requirements: a Mac with Xcode 16 or newer (Xcode 26 to get the Apple Intelligence minutes), and [Homebrew](https://brew.sh).
@@ -85,7 +91,9 @@ MinitsRecordingWidget/      Widget extension (iOS): draws the recording's Live A
   UI/CassetteDeck.swift     The transcript's cassette deck: cassette and reels, VU meters, knobs, piano-key transport, counter
   UI/IntroView.swift        The first-run intro: how it works, on this device, the consent reminder, the microphone
   UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
+  Assets.xcassets/AppIcon.appiconset  The app icon: iOS light and dark (1024 px), Mac at every size
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
+Tools/app-icon/             Draws the app icon (make_icon.py) and renders it into Minits/Assets.xcassets/AppIcon.appiconset (render.js)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
 Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, model download progress, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
