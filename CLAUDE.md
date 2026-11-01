@@ -1,5 +1,13 @@
 # Minits
 
+## Working style: ask everything up front
+
+At the start of every new session, before doing any work:
+
+1. Ask every question you need answered to finish the task without stopping. Ask them all at once, in one message.
+2. Once the user answers, work until the task is done. Don't check in along the way.
+3. Only stop and come back to the user if a step would cost money or can't be undone.
+
 ## Pull requests: always say how to test
 
 Every PR description has a **How to test** section written for the person merging it. Its job is to make sure nothing gets merged untested because they didn't know it needed checking.
