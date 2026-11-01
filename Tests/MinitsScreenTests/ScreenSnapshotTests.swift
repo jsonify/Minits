@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 import XCTest
 
-/// Renders every screen, in each state worth seeing, in light and dark at an iPhone width (390 pt) and a wide
+/// Renders every screen and sheet, in each state worth seeing, in light and dark at an iPhone width (390 pt) and a wide
 /// window's (720 pt, about the Mac's), from `ScreenFixtures`. The PNGs go to `MINITS_SNAPSHOT_DIR` when it's set
 /// (CI uploads them as the `minits-screens` artifact) and are attached to the test results either way.
 ///
@@ -38,7 +38,7 @@ final class ScreenSnapshotTests: XCTestCase {
             Screen(name: "02-home") { _ in AnyView(HomeView()) },
             Screen(name: "03-roll-call") { _ in AnyView(RollCallView()) },
             Screen(name: "04-roll-call-ad-hoc", lastKind: .adHoc) { _ in AnyView(RollCallView()) },
-            Screen(name: "05-add-member", inNavigationStack: false) { _ in AnyView(AddMemberSheet { _, _ in }) },
+            Screen(name: "05-add-member", inNavigationStack: false) { _ in AnyView(MemberSheet { _, _, _ in }) },
             Screen(name: "06-voice-sample", inNavigationStack: false) { f in
                 AnyView(VoiceSampleSheet(member: f.members[3], others: Array(f.members.prefix(3))))
             },
@@ -51,6 +51,12 @@ final class ScreenSnapshotTests: XCTestCase {
                 AnyView(MeetingView(meeting: f.summaryToWrite, initialTab: .minutes))
             },
             Screen(name: "13-minutes") { f in AnyView(MeetingView(meeting: f.minutes, initialTab: .minutes)) },
+            Screen(name: "14-edit-member", inNavigationStack: false) { f in
+                AnyView(MemberSheet(member: f.members[1]) { _, _, _ in })
+            },
+            Screen(name: "15-rename-meeting", inNavigationStack: false) { f in
+                AnyView(MeetingTitleSheet(title: f.minutes.title) { _ in })
+            },
         ]
 
         for screen in screens {

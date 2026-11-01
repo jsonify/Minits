@@ -12,6 +12,7 @@ import UIKit
 /// digits and a bar of LCD cells. If processing fails, a red lamp and the error in a sunken tray, and an orange Try
 /// again key. Once done, the tabs are an SK-1 segmented control, Review carrying how many lines need a look.
 struct MeetingView: View {
+    @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
     @Environment(\.runsMeetingWork) private var runsMeetingWork
@@ -21,6 +22,8 @@ struct MeetingView: View {
     @State private var tab: Tab = .review
     @State private var stage: ProcessingStage = .preparingModels
     @State private var didPickTab = false
+    @State private var renaming = false
+    @State private var confirmingDelete = false
 
     /// `initialTab` opens a finished meeting on that tab instead of picking one (Review if lines need a check, else
     /// the write-up if there is one, else the transcript).
@@ -69,6 +72,41 @@ struct MeetingView: View {
         .sk1Chassis()
         .navigationTitle(meeting.title)
         .inlineTitle()
+        .toolbar {
+            // Not while it's being processed: the transcript is about to be written into it.
+            if meeting.status != .recording, meeting.status != .processing {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Rename…") { renaming = true }
+                        Button("Delete meeting…", role: .destructive) { confirmingDelete = true }
+                    } label: {
+                        Label("Edit", systemImage: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $renaming) {
+            MeetingTitleSheet(title: meeting.title) { title in
+                meeting.title = title
+                try? context.save()
+            }
+        }
+        .confirmationDialog("Delete \(meeting.title)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("Delete meeting", role: .destructive) { delete() }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text("The recording, the transcript and the \(meeting.kind.documentName.lowercased()) are removed from this device. This can't be undone.")
+        }
+    }
+
+    /// Goes back to Home first, then deletes once this screen has gone, so nothing on it reads a deleted meeting.
+    private func delete() {
+        let meeting = meeting
+        router.path = []
+        Task {
+            try? await Task.sleep(for: .milliseconds(600))
+            meeting.delete(from: context)
+        }
     }
 
     private func option(_ tab: Tab) -> SKSegmented<Tab>.Option {

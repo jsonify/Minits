@@ -33,6 +33,7 @@ struct ScreenFixtures {
         ]
         members = people.enumerated().map { index, person in
             let member = Member(name: person.0, role: person.1, sortOrder: index)
+            member.colorIndex = index
             if person.2 {
                 member.embedding = (0..<256).map { Float(($0 + index * 37) % 17) / 17 }
                 member.voiceSavedAt = Self.date

@@ -14,10 +14,13 @@ struct HomeView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
     @Query(sort: \Meeting.startedAt, order: .reverse) private var meetings: [Meeting]
+    @Query(sort: \Member.sortOrder) private var members: [Member]
     @AppStorage("modelsReady") private var modelsReady = false
     @AppStorage("lastMeetingKind") private var lastKind: MeetingKind = .board
     @State private var preparing = false
     @State private var prepareError: String?
+    @State private var renaming: Meeting?
+    @State private var deleting: Meeting?
 
     var body: some View {
         ScrollView {
@@ -43,6 +46,21 @@ struct HomeView: View {
         .sk1Chassis()
         .navigationTitle("")
         .inlineTitle()
+        .task { fillInColors() }
+        .sheet(item: $renaming) { meeting in
+            MeetingTitleSheet(title: meeting.title) { title in
+                meeting.title = title
+                try? context.save()
+            }
+        }
+        .confirmationDialog("Delete \(deleting?.title ?? "this meeting")?",
+                            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible, presenting: deleting) { meeting in
+            Button("Delete meeting", role: .destructive) { meeting.delete(from: context) }
+            Button("Keep it", role: .cancel) {}
+        } message: { meeting in
+            Text("The recording, the transcript and the \(meeting.kind.documentName.lowercased()) are removed from this device. This can't be undone.")
+        }
     }
 
     private var palette: SK1.Palette { SK1.palette(for: scheme) }
@@ -233,7 +251,8 @@ struct HomeView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("\(meeting.title), \(meeting.dateLine), \(status.text), \(SK1.Format.spokenDuration(meeting.durationSeconds))"))
         .contextMenu {
-            Button("Delete meeting", role: .destructive) { delete(meeting) }
+            Button("Rename…") { renaming = meeting }
+            Button("Delete meeting…", role: .destructive) { deleting = meeting }
         }
     }
 
@@ -251,10 +270,9 @@ struct HomeView: View {
         preparing = false
     }
 
-    private func delete(_ meeting: Meeting) {
-        try? FileManager.default.removeItem(at: meeting.audioURL)
-        context.delete(meeting)
-        try? context.save()
+    /// Members saved before avatar colours were stored keep the colour they had (their place in the list).
+    private func fillInColors() {
+        if Member.fillInColors(members) { try? context.save() }
     }
 }
 

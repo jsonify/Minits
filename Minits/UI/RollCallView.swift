@@ -17,6 +17,7 @@ struct RollCallView: View {
     @State private var absent: Set<UUID> = []
     @State private var sampling: Member?
     @State private var addingMember = false
+    @State private var editing: Member?
     @State private var pendingSample: Member?
     @State private var micDenied = false
     @AppStorage("lastMeetingKind") private var kind: MeetingKind = .board
@@ -83,11 +84,17 @@ struct RollCallView: View {
                 sampling = member
             }
         }) {
-            AddMemberSheet { name, role in
+            MemberSheet { name, role, _ in
                 let member = Member(name: name, role: role, sortOrder: (members.map(\.sortOrder).max() ?? 0) + 1)
+                member.colorIndex = Member.nextColor(among: members)
                 context.insert(member)
                 try? context.save()
                 pendingSample = member
+            }
+        }
+        .sheet(item: $editing) { member in
+            MemberSheet(member: member) { name, role, updatingTranscripts in
+                member.update(name: name, role: role, updatingTranscripts: updatingTranscripts, in: context)
             }
         }
     }
@@ -147,11 +154,12 @@ struct RollCallView: View {
                             if index > 0 { SKGroove() }
                             MemberRow(
                                 member: member,
-                                colorIndex: index,
+                                colorIndex: member.colorIndex ?? index,
                                 isHere: !absent.contains(member.id),
                                 toggleHere: { toggle(member) },
                                 record: { sampling = member })
                             .contextMenu {
+                                Button("Edit…") { editing = member }
                                 Button("Re-record voice") { sampling = member }
                                 Button("Remove member", role: .destructive) { remove(member) }
                             }
@@ -299,14 +307,28 @@ private struct MemberRow: View {
     }
 }
 
-/// Adds a member or guest: a name and an optional role, each in an LCD text field.
-struct AddMemberSheet: View {
+/// Adds a member or guest, or edits one: a name and an optional role, each in an LCD text field. Editing keeps the
+/// voice; when the name changes, an opt-in toggle also renames them in transcripts already made.
+struct MemberSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
-    @State private var role = ""
-    let onAdd: (String, String) -> Void
+    @State private var name: String
+    @State private var role: String
+    @State private var updatingTranscripts = false
+    private let member: Member?
+    /// The name, the role and whether to rename them in past transcripts.
+    private let onSave: (String, String, Bool) -> Void
+
+    /// `member` nil adds someone new.
+    init(member: Member? = nil, onSave: @escaping (String, String, Bool) -> Void) {
+        self.member = member
+        self.onSave = onSave
+        _name = State(initialValue: member?.name ?? "")
+        _role = State(initialValue: member?.role ?? "")
+    }
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+
+    private var renamed: Bool { member.map { trimmedName != $0.name && !trimmedName.isEmpty } ?? false }
 
     var body: some View {
         NavigationStack {
@@ -314,39 +336,56 @@ struct AddMemberSheet: View {
                 VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
                     SKCaption("Name")
                     SKTextField("Name", text: $name)
-                        .onSubmit(add)
+                        .onSubmit(save)
                 }
                 VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
                     SKCaption("Role")
                     SKTextField("Role", text: $role, prompt: "Chair, Treasurer, Member…")
-                        .onSubmit(add)
+                        .onSubmit(save)
                     Text("Optional. It's used in the minutes and in the line each member reads.")
                         .sk1Hint()
                         .fixedSize(horizontal: false, vertical: true)
+                }
+                if let member {
+                    if renamed {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Toggle("Rename in past transcripts", isOn: $updatingTranscripts)
+                                .toggleStyle(.sk1Square)
+                            Text(updatingTranscripts
+                                 ? "Every line already marked as \(member.name) will say \(trimmedName). Minutes and summaries already written keep the old name until you redraft them."
+                                 : "Past transcripts keep \(member.name). New meetings use \(trimmedName).")
+                                .sk1Hint()
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    if member.hasVoice {
+                        Text("Their saved voice stays as it is.")
+                            .sk1Hint()
+                    }
                 }
                 Spacer(minLength: 0)
             }
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .sk1Chassis()
-            .navigationTitle("Add member")
+            .navigationTitle(member == nil ? "Add member" : "Edit member")
             .inlineTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add", action: add)
+                    Button(member == nil ? "Add" : "Save", action: save)
                         .disabled(trimmedName.isEmpty)
                 }
             }
         }
         #if os(macOS)
-        .frame(minWidth: 360, minHeight: 260)
+        .frame(minWidth: 360, minHeight: 300)
         #endif
     }
 
-    private func add() {
+    private func save() {
         guard !trimmedName.isEmpty else { return }
-        onAdd(trimmedName, role.trimmingCharacters(in: .whitespaces))
+        onSave(trimmedName, role.trimmingCharacters(in: .whitespaces), renamed && updatingTranscripts)
         dismiss()
     }
 }
