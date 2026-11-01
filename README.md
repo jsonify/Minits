@@ -25,7 +25,7 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
 **Renaming or deleting a meeting.** On a meeting's screen, the **Edit** menu (top right) has **Rename…** and **Delete meeting…**. On Home, touch and hold (right-click on Mac) a past meeting for the same two. Rename opens an LCD text field. Delete asks first, then removes the recording, transcript and write-up from the device; from the meeting's screen it also goes back to Home. Neither is offered while a meeting is recording or processing.
 
-The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline.
+The voice and transcription models download once on first use (a few hundred MB, Wi-Fi recommended). After that the app works offline. Until they're on the device, Home shows a **One-time setup** tray with a **Download now** key. While it downloads, an LCD there shows a blinking DOWNLOADING lamp, which model and step it's on (e.g. `TRANSCRIPTION MODEL · FILE 3 OF 5`, then `SETTING UP TRANSCRIPTION MODEL`), how far along the whole download is as a percentage, and a bar of cells. On iPhone the screen stays on until it's done. If it fails, a red lamp shows why and the key reads **Try again**.
 
 ## Look
 
@@ -78,7 +78,7 @@ Minits/
   Eval/                     Speaker-attribution scoring and labeling (not part of the app; used by tests and the eval tool)
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
-Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
+Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, model download progress, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
 Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), and tests of member and meeting edits and the PDF export; run on the iOS Simulator
 docs/specs/                 Feature specs
 ```
@@ -96,7 +96,7 @@ CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme 
 
 ### Screenshots
 
-`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with its player bar), a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, the transcript player paused partway with a speaker showing, and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
+`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with its player bar), a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, the transcript player paused partway with a speaker showing, Home's model download tray (downloading, and failed), and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
 
 - **On a PR:** open the CI run's Summary page and download the `minits-screens` artifact (PNGs at 2x, named like `10-review-iphone-dark.png`).
 - **Locally:** run the command above. With `MINITS_SNAPSHOT_DIR` set (on the command line, as `TEST_RUNNER_MINITS_SNAPSHOT_DIR`, or in the scheme's environment) the PNGs are written there. Either way they're attached to the test results in Xcode's Report navigator.

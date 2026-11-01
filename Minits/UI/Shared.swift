@@ -1,4 +1,5 @@
 import SK1Tokens
+import SK1UI
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -71,6 +72,26 @@ struct Avatar: View {
     ]
     private static let guest = (fill: Color(light: 0xE6ECF2, dark: SK1.dark.keyTop),
                                 ink: Color(light: 0x4A5868, dark: SK1.dark.ink))
+}
+
+/// How far something has got (processing a meeting, the model download), as a row of LCD cells: the done ones in the LCD's ink, the rest faint as an unlit
+/// seven-segment is.
+struct ProgressCells: View {
+    let fraction: Double
+    var count = 24
+
+    var body: some View {
+        let ink = Color(sk1Hex: SK1.lcdInk)
+        let lit = Int((min(max(fraction, 0), 1) * Double(count)).rounded())
+        HStack(spacing: 2) {
+            ForEach(0..<count, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(index < lit ? ink : ink.opacity(SK1.SevenSegment.unlitOpacity))
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
+    }
 }
 
 extension EnvironmentValues {
