@@ -73,6 +73,12 @@ struct Avatar: View {
                                 ink: Color(light: 0x4A5868, dark: SK1.dark.ink))
 }
 
+extension EnvironmentValues {
+    /// Whether screens start their work when they appear: recording on the recording screen, processing on the
+    /// meeting screen. The screenshot tests turn it off, so they show each screen without the mic or the models.
+    @Entry var runsMeetingWork = true
+}
+
 extension View {
     /// An inline title on iPhone; plain on Mac.
     func inlineTitle() -> some View {

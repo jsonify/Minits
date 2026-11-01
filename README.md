@@ -63,6 +63,7 @@ Minits/
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
 Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
+Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), run on the iOS Simulator
 docs/specs/                 Feature specs
 ```
 
@@ -72,9 +73,18 @@ docs/specs/                 Feature specs
 xcodegen
 xcodebuild test -scheme MinitsEvalTests -destination 'platform=macOS'
 xcodebuild test -scheme MinitsTests -destination 'platform=macOS'
+MINITS_SNAPSHOT_DIR=/tmp/minits-screens xcodebuild test -scheme MinitsScreenTests -destination 'platform=iOS Simulator,name=iPhone 16'
 ```
 
-CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme for the iOS Simulator and for macOS without signing, runs `MinitsEvalTests`, and lists compiler warnings in `Minits/UI` and `MinitsApp.swift` in the run summary (any warning there fails the run). It doesn't run `MinitsTests`, which needs the models.
+CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme for the iOS Simulator and for macOS without signing, runs `MinitsEvalTests` and `MinitsScreenTests`, and lists compiler warnings in `Minits/UI` and `MinitsApp.swift` in the run summary (any warning there fails the run). It doesn't run `MinitsTests`, which needs the models.
+
+### Screenshots
+
+`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript, a summary not yet written and finished minutes. Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
+
+- **On a PR:** open the CI run's Summary page and download the `minits-screens` artifact (PNGs at 2x, named like `10-review-iphone-dark.png`).
+- **Locally:** run the command above. With `MINITS_SNAPSHOT_DIR` set (on the command line, as `TEST_RUNNER_MINITS_SNAPSHOT_DIR`, or in the scheme's environment) the PNGs are written there. Either way they're attached to the test results in Xcode's Report navigator.
+- **The sample data** is in `Tests/MinitsScreenTests/ScreenFixtures.swift`. Add a state there and a line in `ScreenSnapshotTests.swift` when a screen gains one.
 
 `MinitsTests` downloads FluidAudio's models on first run and needs a Mac with a Neural Engine (Apple Silicon) — the ASR model crashes on Intel Macs.
 

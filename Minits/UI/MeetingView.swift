@@ -14,12 +14,23 @@ import UIKit
 struct MeetingView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.runsMeetingWork) private var runsMeetingWork
     @Query(sort: \Member.sortOrder) private var members: [Member]
     @Bindable var meeting: Meeting
 
     @State private var tab: Tab = .review
     @State private var stage: ProcessingStage = .preparingModels
     @State private var didPickTab = false
+
+    /// `initialTab` opens a finished meeting on that tab instead of picking one (Review if lines need a check, else
+    /// the write-up if there is one, else the transcript).
+    init(meeting: Meeting, initialTab: Tab? = nil) {
+        _meeting = Bindable(meeting)
+        if let initialTab {
+            _tab = State(initialValue: initialTab)
+            _didPickTab = State(initialValue: true)
+        }
+    }
 
     enum Tab: String, CaseIterable, Identifiable {
         case review = "Review", transcript = "Transcript", minutes = "Minutes"
@@ -85,7 +96,10 @@ struct MeetingView: View {
             Spacer()
         }
         .padding(20)
-        .task(id: meeting.id) { await process() }
+        .task(id: meeting.id) {
+            guard runsMeetingWork else { return }
+            await process()
+        }
     }
 
     private var processingLCD: some View {
