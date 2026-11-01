@@ -35,6 +35,7 @@ Requirements: a Mac with Xcode 16 or newer (Xcode 26 to get the Apple Intelligen
 brew install xcodegen
 git clone https://github.com/jsonify/Minits.git
 cd Minits
+git config core.hooksPath .githooks   # once per clone: regenerate the project after every pull (see below)
 xcodegen
 open Minits.xcodeproj
 ```
@@ -47,13 +48,16 @@ In Xcode:
    - First time: on the iPhone, turn on **Settings › Privacy & Security › Developer Mode**, then trust your profile in **Settings › General › VPN & Device Management**.
    - With a free Apple ID the iPhone app stops opening after **7 days**. Plug in and press ⌘R again to renew it; your saved voices and meetings stay.
 
-**After every `git pull`, run `xcodegen` again** if `project.yml` changed. `Minits.xcodeproj` is generated, not committed, so an old copy doesn't know about new packages. The build then fails with *Unable to resolve module dependency: 'SK1Tokens'*, or, after a file was removed or added, *Build input file cannot be found: '…/Minits/UI/Theme.swift'*. Xcode fetches the Swift packages (FluidAudio, SK1Kit) on the first build after that. When `project.yml` raises a package's version and Xcode keeps the old one (for example *Cannot find 'SKTextField' in scope* while SK1Kit still shows 0.2.0 under Package Dependencies), use **File › Packages › Update to Latest Package Versions**; if it still can't resolve them, use **File › Packages › Reset Package Caches**.
+**Keep the project current after every `git pull`.** `Minits.xcodeproj` is generated, not committed, so an old copy doesn't know about new packages or files. With the hooks turned on (`git config core.hooksPath .githooks`, once per clone), git runs `xcodegen` for you after `git pull`, `git merge`, switching branches and `git rebase`, including when you pull from Xcode. If Xcode is open, it reloads the project. Without the hooks, run `xcodegen` yourself after every pull. If `xcodegen` isn't installed, the hook says so and the pull still goes through. Check whether the hooks are on with `git config core.hooksPath` (it prints `.githooks`).
+
+If you skip the regenerate, the build fails. It fails with *Unable to resolve module dependency: 'SK1Tokens'*, or, after a file was removed or added, *Build input file cannot be found: '…/Minits/UI/Theme.swift'*. Xcode fetches the Swift packages (FluidAudio, SK1Kit) on the first build after that. When `project.yml` raises a package's version and Xcode keeps the old one (for example *Cannot find 'SKTextField' in scope* while SK1Kit still shows 0.2.0 under Package Dependencies), use **File › Packages › Update to Latest Package Versions**; if it still can't resolve them, use **File › Packages › Reset Package Caches**.
 
 ## Project layout
 
 ```
 project.yml                 XcodeGen spec (one app target for iOS 17+ and macOS 14+; packages FluidAudio, SK1Kit)
 Config/Signing.xcconfig     App bundle ID and team defaults; includes your gitignored Config/Local.xcconfig
+.githooks/                  Git hooks that run xcodegen after a pull, merge, branch switch or rebase (turn on: git config core.hooksPath .githooks)
 .github/workflows/ci.yml    CI: builds the app for iOS and macOS and runs MinitsEvalTests on every push and PR
 Minits/
   MinitsApp.swift           App entry, navigation

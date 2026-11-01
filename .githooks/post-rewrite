@@ -1,0 +1,4 @@
+#!/bin/sh
+# After `git rebase` (including `git pull --rebase`). Skips `git commit --amend`.
+[ "$1" = "rebase" ] || exit 0
+exec "$(dirname "$0")/regenerate"

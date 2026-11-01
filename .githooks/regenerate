@@ -1,0 +1,12 @@
+#!/bin/sh
+# Regenerates Minits.xcodeproj after git changes the files, so Xcode sees new files and packages.
+# Called by the post-merge, post-checkout and post-rewrite hooks. Turn them on once per clone:
+#   git config core.hooksPath .githooks
+
+[ -f project.yml ] || exit 0
+if command -v xcodegen >/dev/null 2>&1; then
+    xcodegen --quiet || echo "Minits: xcodegen failed; run 'xcodegen' to see why." >&2
+else
+    echo "Minits: xcodegen isn't installed, so Minits.xcodeproj wasn't regenerated. Run 'brew install xcodegen', then 'xcodegen'." >&2
+fi
+exit 0

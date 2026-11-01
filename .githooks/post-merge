@@ -1,0 +1,3 @@
+#!/bin/sh
+# After `git pull` or `git merge`.
+exec "$(dirname "$0")/regenerate"
