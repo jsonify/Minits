@@ -15,7 +15,9 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
    Without Apple Intelligence you get an outline built from the transcript instead: likely decisions and action items pulled out by phrases like "agreed" or "I'll", each marked spot quoted, and (for ad-hoc meetings) the full transcript.
 
-   The orange key drafts it, with an LCD readout of what it's doing; lines still to check get an amber note first. The draft is editable in a tray under a teal DRAFT lamp, with **Redraft** (asks first), **Copy** and the orange **Share** key. If drafting fails you get the outline, with the error shown above it.
+   The orange key drafts it, with an LCD readout of what it's doing; lines still to check get an amber note first. The draft is editable in a tray under a teal DRAFT lamp, with **Redraft** (asks first), **Copy**, **PDF** and the orange **Share** key. If drafting fails you get the outline, with the error shown above it.
+
+   **PDF** makes a plain, printable PDF (black on white, not the SK-1 look) named after the meeting, e.g. `October Board Meeting.pdf`: the meeting's title and date, for a board meeting the attendance (members here and absent, with their roles), then the minutes or summary as edited, with Markdown headings (`#`, `**Bold line**`, ALL-CAPS lines and the section names the drafts use) and bulleted or numbered lists kept, and *Page 1 of 3* at the foot of each page. Pages break between lines and never end on a heading. Paper is US Letter in regions that use US measurements, A4 elsewhere. On iPhone it opens the share sheet (Save to Files, Mail, AirDrop, Print…); on Mac it opens a save panel. It's made on the device, with no network.
 
 **Renaming or deleting a meeting.** On a meeting's screen, the **Edit** menu (top right) has **Rename…** and **Delete meeting…**. On Home, touch and hold (right-click on Mac) a past meeting for the same two. Rename opens an LCD text field. Delete asks first, then removes the recording, transcript and write-up from the device; from the meeting's screen it also goes back to Home. Neither is offered while a meeting is recording or processing.
 
@@ -59,6 +61,7 @@ Minits/
   Audio/                    16 kHz mono WAV recorder, clip playback
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
+  Export/MinutesPDF.swift   The minutes or summary as a printable PDF (Core Text; reads the draft's Markdown, paginates)
   UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
   UI/MeetingTitleSheet.swift Rename a meeting (from Home and the meeting screen)
   UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
@@ -66,7 +69,7 @@ Minits/
 Tools/minits-eval/          `minits-eval` command-line tool (macOS): check, label, spotcheck, run, compare
 Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed, no FluidAudio)
 Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
-Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), and tests of member and meeting edits; run on the iOS Simulator
+Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), and tests of member and meeting edits and the PDF export; run on the iOS Simulator
 docs/specs/                 Feature specs
 ```
 
@@ -118,4 +121,3 @@ minits-eval compare before.json after.json
 ## Not yet
 
 - Live transcript while recording (the transcript is made after the meeting ends).
-- PDF export (Share → Print → save as PDF works in the meantime).
