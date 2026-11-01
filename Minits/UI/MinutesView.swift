@@ -2,6 +2,7 @@ import SK1Tokens
 import SK1UI
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit
 #else
@@ -12,7 +13,7 @@ import AppKit
 ///
 /// SK-1 look: before a draft, what will happen, any lines still to check (amber lamp) and the orange key that drafts
 /// it, with an LCD readout while it works. After, a teal DRAFT lamp and a Redraft key, the text in a sunken tray, and
-/// the Copy and orange Share keys.
+/// the Copy, PDF and orange Share keys.
 struct MinutesView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
@@ -23,6 +24,9 @@ struct MinutesView: View {
     @State private var progressText = ""
     @State private var errorText: String?
     @State private var confirmingRedo = false
+    #if os(macOS)
+    @State private var savingPDF = false
+    #endif
 
     var body: some View {
         Group {
@@ -126,6 +130,7 @@ struct MinutesView: View {
                     Label("Copy", systemImage: "doc.on.doc")
                 }
                 .buttonStyle(.sk1Key(.cream, size: .large))
+                pdfKey
                 ShareLink(item: meeting.minutes ?? "", subject: Text(meeting.title)) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
@@ -140,6 +145,33 @@ struct MinutesView: View {
         } message: {
             Text("Useful after fixing speaker names. Any edits you made here will be replaced.")
         }
+    }
+
+    /// The minutes or summary as a printable PDF named after the meeting.
+    private var pdf: MinutesPDF { MinutesPDF(meeting: meeting, members: members) }
+
+    /// iPhone: the share sheet with the PDF file. Mac: a save panel.
+    @ViewBuilder private var pdfKey: some View {
+        #if os(iOS)
+        let file = pdf
+        ShareLink(item: file, preview: SharePreview(file.fileName)) {
+            Label("PDF", systemImage: "doc.richtext")
+        }
+        .buttonStyle(.sk1Key(.cream, size: .large))
+        #else
+        Button {
+            savingPDF = true
+        } label: {
+            Label("PDF", systemImage: "doc.richtext")
+        }
+        .buttonStyle(.sk1Key(.cream, size: .large))
+        .fileExporter(isPresented: $savingPDF, item: pdf, contentTypes: [.pdf],
+                      defaultFilename: pdf.baseName) { result in
+            if case .failure(let error) = result {
+                errorText = "Couldn't save the PDF: \(error.localizedDescription)"
+            }
+        }
+        #endif
     }
 
     private func draft() async {
