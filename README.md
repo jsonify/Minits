@@ -110,6 +110,7 @@ Tests/MinitsEvalTests/      Unit tests for Eval/ (run on a Mac, no iPhone needed
 Tests/MinitsTests/          Tests for Voice/ and Minutes/ (VoiceTuning, model download progress, a VoiceEngine snapshot test, the outline fallback; needs FluidAudio + a Mac)
 Tests/MinitsScreenTests/    Screenshots of every screen from sample data (ScreenFixtures.swift), and tests of member and meeting edits and the PDF export; run on the iOS Simulator
 docs/specs/                 Feature specs
+docs/research/              Competitive research and feature ideas (competitive-features.md)
 ```
 
 ## Tests
