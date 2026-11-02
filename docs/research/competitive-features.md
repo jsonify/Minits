@@ -152,6 +152,21 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** Computed from `TranscriptLine` durations, shown in a Meeting tab.
 
+### 13. Next meeting: the next agenda, on the calendar before everyone leaves ([#56](https://github.com/jsonify/Minits/issues/56))
+
+**Inspired by:** board portals rolling open items forward into the next meeting book, and Granola's briefs. Suggested in review of this research.
+
+**What it does:** When a board meeting is processed, a **Next meeting** step drafts the next agenda: the standard order (Call to Order, Approval of these minutes, Reports, Old Business, New Business, Adjournment), with Old Business filled from unfinished action items and tabled motions, and New Business from anything someone said should go on the next agenda. The date and time come from the meeting if someone said one, or else the same weekday and time next month. Edit it in an LCD tray, then put it on the calendar:
+
+- **Through the phone's own calendar (EventKit).** Minits creates the event, with the agenda in the notes, in whichever calendar you pick. **Zoho Calendar** works through CalDAV: add the Zoho account once in Settings › Calendar › Accounts › Add Account › Other › CalDAV (server `calendar.zoho.com`, or your regional one), and iOS or macOS syncs the event to Zoho. Google, Outlook and iCloud work the same way. EventKit can't add invitees itself, so Minits opens the system's event editor already filled in and you add the board.
+- **Share invite.** An `.ics` file with the agenda, through the share sheet, for anyone without a calendar account on the device.
+
+The agenda then loads at the next roll call (#3, #4).
+
+**Why it's thoughtful:** The next meeting is scheduled while everyone's still in the room, and nothing is forgotten between meetings. Going through the device's calendar keeps Minits off the network, with no Zoho login to store, and works for every calendar provider. Connecting to Zoho's API directly would invite people automatically, but it needs a Zoho sign-in and a registered app, and it sends the agenda to Zoho's servers, so it's left out.
+
+**Where:** A new step after the minutes in `UI/MinutesView.swift`, EventKit and EventKitUI for the event, and an `.ics` writer next to `Export/MinutesPDF.swift`. Depends on #2.
+
 ## What not to copy
 
 - **Cloud chat, sync and a public API** (Granola, Fireflies): these would break the core promise. #7 gives the benefit without them.
@@ -161,9 +176,9 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 ## Suggested order
 
-1. **#2 Motions and action items as data.** It's the foundation for #1, #3, #5 and #11.
+1. **#2 Motions and action items as data.** It's the foundation for #1, #3, #5, #11 and #13.
 2. **#9 Note on the mark** and **#4 Agenda-first**: small changes that make every draft better.
-3. **#3 The meeting series** (open items, approval of prior minutes).
+3. **#3 The meeting series** (open items, approval of prior minutes), then **#13 Next meeting** on top of it.
 4. **#1 Voice roll-call votes**: the standout feature, built once issues #7 (crosstalk) and #9 (the attribution epic) make short words reliable.
 5. **#5 Traced sentences**, **#6 Off-the-record**, **#7 Ask your meetings**.
 6. The rest as they fit.
@@ -177,6 +192,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 - [GovTech: AI and meeting minutes](https://www.govtech.com/artificial-intelligence/ai-takes-the-drudgery-out-of-compiling-meeting-minutes), [Brass Transcripts: government meetings](https://brasstranscripts.com/blog/government-meeting-documentation-ai-transcription-minutes), [Smart Cities Dive: AI for municipal clerks](https://www.smartcitiesdive.com/news/ai-municipal-clerks-speed-up-public-records-reporting/820216/)
 - On-device apps: [Synopsule](https://hunted.space/product/synopsule), [Vocatim](https://apps.apple.com/app/id6761047706), [Meeting Assist Local](https://apps.apple.com/app/id6759475140), [AI Meeting Notes – Transcribe](https://apps.apple.com/us/app/-/id6759388036), [HuddleNotes](https://mwm.ai/apps/huddlenotes-meeting-notes/6778677679), [Minuted](https://mwm.ai/apps/minuted-ai-meeting-notes/6781033691)
 - Talk-time analytics: [Fireflies conversation intelligence](https://guide.fireflies.ai/articles/2608597716-understand-fireflies-analytics-and-conversation-intelligence), [tl;dv speaker insights](https://intercom.help/tldv/en/articles/9041193-speaker-insights), [Claap speaker insights](https://help.claap.io/en/articles/7252571-speaker-insights), [Avoma speaker percentages](https://help.avoma.com/speaker-percentages-and-monologues)
+- Zoho Calendar: [CalDAV sync setup](https://www.zoho.com/calendar/help/setup-caldav-sync.html), [Sync Zoho Calendar on iPhone](https://www.zoho.com/calendar/how-to/sync-calendar-on-iphone.html), [Deluge: create event (API)](https://www.zoho.com/deluge/help/calendar/create-event.html)
 - Apple: [Gadget Hacks: iOS 26 Notes](https://ios.gadgethacks.com/news/why-ios-26-turns-apple-notes-into-the-productivity-powerhouse-you-never-knew-you-needed/), [MacRumors: Notes and Reminders in iOS 26](https://www.macrumors.com/2025/06/09/four-features-coming-to-apple-reminders-and-notes/)
 
 Most competitor details come from vendor pages and review sites rather than hands-on testing. ProductHunt, GetApp and Peerlist pages couldn't be reached from the research environment.
