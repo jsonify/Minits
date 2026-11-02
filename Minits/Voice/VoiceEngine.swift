@@ -19,6 +19,8 @@ struct ProcessedLine: Sendable {
     var confidence: Double
     var needsReview: Bool
     var reviewNote: String?
+    /// When each word of `text` starts, in seconds.
+    var wordStarts: [Double] = []
 }
 
 enum ProcessingStage: Sendable, Equatable {
@@ -346,13 +348,15 @@ actor VoiceEngine {
         let wordsBySegment = Self.assign(words: words, to: segments)
 
         for (index, segment) in segments.enumerated() {
-            let text = (wordsBySegment[index] ?? []).map(\.word).joined(separator: " ")
+            let segmentWords = wordsBySegment[index] ?? []
+            let text = segmentWords.map(\.word).joined(separator: " ")
             guard !text.isEmpty else { continue }
 
             var line = ProcessedLine(
                 start: Double(segment.startTimeSeconds), end: Double(segment.endTimeSeconds),
                 text: text, speakerID: nil, speakerName: "", alternateSpeakerID: nil,
-                confidence: 0, needsReview: false, reviewNote: nil)
+                confidence: 0, needsReview: false, reviewNote: nil,
+                wordStarts: segmentWords.map { Double($0.startTime) })
 
             let cluster = clusterToMember[segment.speakerId]
             var chosen = cluster?.id
@@ -459,6 +463,7 @@ actor VoiceEngine {
                last.text.count + line.text.count < 600 {
                 last.end = line.end
                 last.text += " " + line.text
+                last.wordStarts += line.wordStarts
                 last.confidence = min(last.confidence, line.confidence)
                 merged[merged.count - 1] = last
             } else {

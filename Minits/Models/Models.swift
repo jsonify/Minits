@@ -190,6 +190,9 @@ final class TranscriptLine {
     var confidence: Double = 0
     var needsReview: Bool = false
     var reviewNote: String?
+    /// When each word of `text` starts, in seconds, so a line can be split exactly where a second voice comes in.
+    /// Empty for lines transcribed before Minits kept them (a split then estimates the time).
+    var wordStarts: [Double] = []
     var meeting: Meeting?
 
     init(start: Double, end: Double, text: String) {
