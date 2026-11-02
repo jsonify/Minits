@@ -25,7 +25,8 @@ enum ProcessingStage: Sendable, Equatable {
     case preparingModels
     case findingSpeakers(Double)
     case matchingVoices
-    case transcribing
+    /// How far through the recording transcription has got, from the windows FluidAudio has finished.
+    case transcribing(Double)
     case assembling
 
     var label: String {
@@ -38,14 +39,57 @@ enum ProcessingStage: Sendable, Equatable {
         }
     }
 
+    /// Which step this is, of `ProcessingStage.stepCount`.
+    var step: Int {
+        switch self {
+        case .preparingModels: return 1
+        case .findingSpeakers: return 2
+        case .matchingVoices: return 3
+        case .transcribing: return 4
+        case .assembling: return 5
+        }
+    }
+
+    static let stepCount = 5
+
+    /// How far the whole job is. Transcription takes the most time, so it gets the biggest share.
     var fraction: Double {
         switch self {
-        case .preparingModels: return 0.05
-        case .findingSpeakers(let p): return 0.05 + 0.45 * p
-        case .matchingVoices: return 0.55
-        case .transcribing: return 0.65
+        case .preparingModels: return 0.03
+        case .findingSpeakers(let p): return 0.05 + 0.40 * Self.clamped(p)
+        case .matchingVoices: return 0.45
+        case .transcribing(let p): return 0.50 + 0.45 * Self.clamped(p)
         case .assembling: return 0.95
         }
+    }
+
+    /// Where this step ends: the readout creeps toward it between real updates, so a step that reports nothing
+    /// (loading models, matching, a single-window transcript) still visibly moves.
+    var ceiling: Double {
+        switch self {
+        case .preparingModels: return 0.05
+        case .findingSpeakers: return 0.45
+        case .matchingVoices: return 0.50
+        case .transcribing: return 0.95
+        case .assembling: return 0.99
+        }
+    }
+
+    private static func clamped(_ p: Double) -> Double { min(max(p, 0), 1) }
+}
+
+/// Counts the transcription windows FluidAudio has finished. They finish out of order on several workers and a
+/// window can be reported twice, so it counts distinct indices.
+final class FinishedWindows: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done: Set<Int> = []
+
+    /// Records `index` as done and returns how many distinct windows are.
+    func finish(_ index: Int) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        done.insert(index)
+        return done.count
     }
 }
 
@@ -275,10 +319,24 @@ actor VoiceEngine {
         }
 
         // 3. What was said.
-        progress(.transcribing)
+        progress(.transcribing(0))
         let asr = try await asrManager()
         var state = TdtDecoderState.make(decoderLayers: await asr.decoderLayerCount)
-        let transcript = try await asr.transcribe(url, decoderState: &state)
+        // Long recordings are read in windows; each one finished moves the readout on.
+        let windows = FinishedWindows()
+        await asr.setWindowHandler { window in
+            let done = windows.finish(window.index)
+            progress(.transcribing(Double(done) / Double(max(window.windowCount, 1))))
+        }
+        let transcript: ASRResult
+        do {
+            transcript = try await asr.transcribe(url, decoderState: &state)
+            await asr.setWindowHandler(nil)
+        } catch {
+            await asr.setWindowHandler(nil)
+            throw error
+        }
+        progress(.transcribing(1))
         let words = buildWordTimings(from: transcript.tokenTimings ?? [])
 
         // 4. Stitch words onto speaker segments.

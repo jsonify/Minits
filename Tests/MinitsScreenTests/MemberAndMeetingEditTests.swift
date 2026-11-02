@@ -56,6 +56,23 @@ final class MemberAndMeetingEditTests: XCTestCase {
         XCTAssertFalse(Member.fillInColors(members), "nothing left to fill in")
     }
 
+    func testForgetVoiceKeepsTheMember() throws {
+        let context = try makeContext()
+        let sam = member("Sam", color: 0, in: context)
+        sam.role = "Coach"
+        sam.embedding = [0.1, 0.2, 0.3]
+        sam.voiceSavedAt = Date()
+        XCTAssertTrue(sam.hasVoice)
+
+        sam.forgetVoice(in: context)
+
+        XCTAssertFalse(sam.hasVoice)
+        XCTAssertNil(sam.voiceSavedAt)
+        XCTAssertEqual(sam.name, "Sam")
+        XCTAssertEqual(sam.role, "Coach")
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Member>()).count, 1)
+    }
+
     func testUpdateRenamesPastLinesOnlyWhenAsked() throws {
         let context = try makeContext()
         let dev = member("Dev Patel", color: 0, in: context)

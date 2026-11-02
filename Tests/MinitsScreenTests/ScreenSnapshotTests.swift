@@ -18,6 +18,8 @@ final class ScreenSnapshotTests: XCTestCase {
         var modelsReady = true
         /// A sheet brings its own navigation bar; a pushed screen gets one here.
         var inNavigationStack = true
+        /// Draw it with nothing saved.
+        var emptyStore = false
         let view: @MainActor (ScreenFixtures) -> AnyView
     }
 
@@ -34,13 +36,13 @@ final class ScreenSnapshotTests: XCTestCase {
         if let folder { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
 
         let screens: [Screen] = [
-            Screen(name: "01-home-empty", modelsReady: false) { _ in AnyView(HomeView()) },
+            Screen(name: "01-home-empty", modelsReady: false, emptyStore: true) { _ in AnyView(HomeView()) },
             Screen(name: "02-home") { _ in AnyView(HomeView()) },
             Screen(name: "03-roll-call") { _ in AnyView(RollCallView()) },
             Screen(name: "04-roll-call-ad-hoc", lastKind: .adHoc) { _ in AnyView(RollCallView()) },
             Screen(name: "05-add-member", inNavigationStack: false) { _ in AnyView(MemberSheet { _, _, _ in }) },
             Screen(name: "06-voice-sample", inNavigationStack: false) { f in
-                AnyView(VoiceSampleSheet(member: f.members[3], others: Array(f.members.prefix(3))))
+                AnyView(VoiceSampleSheet(member: f.members[3], others: Array(f.members.prefix(3)), kind: .board))
             },
             Screen(name: "07-recording") { f in AnyView(RecordingView(meeting: f.recording)) },
             Screen(name: "08-processing") { f in AnyView(MeetingView(meeting: f.processing)) },
@@ -79,10 +81,43 @@ final class ScreenSnapshotTests: XCTestCase {
             },
             Screen(name: "19-intro", inNavigationStack: false) { _ in AnyView(IntroView(mic: .undetermined) {}) },
             Screen(name: "20-intro-mic-off", inNavigationStack: false) { _ in AnyView(IntroView(mic: .denied) {}) },
+            Screen(name: "21-people") { _ in AnyView(PeopleView()) },
+            Screen(name: "22-people-empty", emptyStore: true) { _ in AnyView(PeopleView()) },
+            Screen(name: "23-add-person-ad-hoc", inNavigationStack: false) { _ in
+                AnyView(MemberSheet(kind: .adHoc) { _, _, _ in })
+            },
+            Screen(name: "24-end-meeting", inNavigationStack: false) { _ in
+                AnyView(ConfirmSheet(
+                    title: "End the meeting?",
+                    message: "Minits will stop recording and start working out who said what. You can't add to this recording afterwards.",
+                    readout: "01:13 RECORDED · 2 MOMENTS",
+                    confirmTitle: "End and make the transcript", tone: .stop, cancelTitle: "Keep recording") {}
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .sk1Chassis())
+            },
+            Screen(name: "25-forget-voice", inNavigationStack: false) { f in
+                AnyView(ConfirmSheet(
+                    title: "Forget \(f.members[0].name)'s voice?",
+                    message: "Minits will no longer recognise \(f.members[0].name). They stay on your list, and you can record their voice again any time. Past transcripts don't change.",
+                    confirmTitle: "Forget voice", confirmSymbol: "waveform.slash", cancelTitle: "Keep it") {}
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .sk1Chassis())
+            },
+            Screen(name: "26-summary-writing", inNavigationStack: false) { _ in
+                AnyView(VStack(alignment: .leading, spacing: 14) {
+                    WorkingLCD(label: "Writing the summary", step: 3, stepCount: 3, fraction: 0.55, ceiling: 0.97)
+                    WorkingLCD(label: "Writing the transcript", step: 4, stepCount: ProcessingStage.stepCount,
+                               fraction: ProcessingStage.transcribing(0.4).fraction,
+                               ceiling: ProcessingStage.transcribing(0.4).ceiling)
+                    Spacer()
+                }
+                .padding(20)
+                .sk1Chassis())
+            },
         ]
 
         for screen in screens {
-            let container = screen.name == "01-home-empty" ? empty : fixtures.container
+            let container = screen.emptyStore ? empty : fixtures.container
             UserDefaults.standard.set(screen.modelsReady, forKey: "modelsReady")
             UserDefaults.standard.set(screen.lastKind.rawValue, forKey: "lastMeetingKind")
             // Home would put the first-run intro over itself; the intro has its own screens.

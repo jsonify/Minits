@@ -11,7 +11,7 @@ import UIKit
 /// SK-1 look: an LCD header (name, status, the meeting count in seven-segment digits), a tray with one key per kind of
 /// meeting (the last one used is lit with SK-1's orange "on" bar), the one-time model download when it's needed, and
 /// the past meetings as rows in one sunken tray, each with a status lamp. Picking a kind saves it as the last used and
-/// opens roll call with it selected.
+/// opens roll call with it selected. A cream People key opens the saved people (`PeopleView`).
 struct HomeView: View {
     @Environment(Router.self) private var router
     @Environment(\.modelContext) private var context
@@ -40,6 +40,8 @@ struct HomeView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 startTray
+
+                peopleKey
 
                 if !modelsReady { setup }
 
@@ -164,6 +166,28 @@ struct HomeView: View {
                     .accessibilityLabel(Text("For example: \(kind.example)"))
                 Spacer(minLength: 0)
             }
+        }
+    }
+
+    // MARK: - People
+
+    /// Opens the People screen, where saved people and voices are edited or removed outside a meeting.
+    private var peopleKey: some View {
+        let voices = members.filter(\.hasVoice).count
+        return VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
+            SKCaption("People")
+            Button {
+                router.path.append(.people)
+            } label: {
+                Label(members.isEmpty ? "Add people" : "People · \(members.count) saved", systemImage: "person.2")
+            }
+            .buttonStyle(.sk1Key(.cream))
+            .accessibilityHint(Text("Edit people, re-record or forget voices, or remove someone"))
+            Text(members.isEmpty
+                 ? "Save the people you meet with so Minits can learn their voices."
+                 : "\(voices) of \(members.count) have a saved voice. Edit, forget a voice or remove someone here.")
+                .sk1Hint()
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -75,6 +75,16 @@ extension Member {
     }
 }
 
+extension Member {
+    /// Forgets how this member sounds: the voiceprint goes, the member stays. New meetings show them as a guest until
+    /// they record again; transcripts already made keep the names they have.
+    func forgetVoice(in context: ModelContext) {
+        voiceprint = nil
+        voiceSavedAt = nil
+        try? context.save()
+    }
+}
+
 enum MeetingStatus: String, Codable {
     case recording, processing, needsReview, ready, failed
 }

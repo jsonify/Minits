@@ -15,9 +15,8 @@ struct RollCallView: View {
     @Query(sort: \Member.sortOrder) private var members: [Member]
 
     @State private var absent: Set<UUID> = []
-    @State private var sampling: Member?
+    @State private var actions = MemberActionState()
     @State private var addingMember = false
-    @State private var editing: Member?
     @State private var pendingSample: Member?
     @State private var micDenied = false
     @AppStorage("lastMeetingKind") private var kind: MeetingKind = .board
@@ -74,17 +73,14 @@ struct RollCallView: View {
         .safeAreaInset(edge: .bottom) { footer }
         .navigationTitle("Step 1 of 2")
         .inlineTitle()
-        .sheet(item: $sampling) { member in
-            VoiceSampleSheet(member: member, others: members.filter { $0.id != member.id })
-        }
         .sheet(isPresented: $addingMember, onDismiss: {
             // Go straight to recording the new member's voice once the add sheet is gone.
             if let member = pendingSample {
                 pendingSample = nil
-                sampling = member
+                actions.sampling = member
             }
         }) {
-            MemberSheet { name, role, _ in
+            MemberSheet(kind: kind) { name, role, _ in
                 let member = Member(name: name, role: role, sortOrder: (members.map(\.sortOrder).max() ?? 0) + 1)
                 member.colorIndex = Member.nextColor(among: members)
                 context.insert(member)
@@ -92,11 +88,7 @@ struct RollCallView: View {
                 pendingSample = member
             }
         }
-        .sheet(item: $editing) { member in
-            MemberSheet(member: member) { name, role, updatingTranscripts in
-                member.update(name: name, role: role, updatingTranscripts: updatingTranscripts, in: context)
-            }
-        }
+        .memberActionSheets($actions, members: members, kind: kind)
     }
 
     private var palette: SK1.Palette { SK1.palette(for: scheme) }
@@ -146,7 +138,7 @@ struct RollCallView: View {
 
     private var memberTray: some View {
         VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
-            SKCaption("Members")
+            SKCaption(kind == .board ? "Members" : "People")
             if !members.isEmpty {
                 SKWell {
                     VStack(spacing: 0) {
@@ -157,12 +149,9 @@ struct RollCallView: View {
                                 colorIndex: member.colorIndex ?? index,
                                 isHere: !absent.contains(member.id),
                                 toggleHere: { toggle(member) },
-                                record: { sampling = member })
-                            .contextMenu {
-                                Button("Edit…") { editing = member }
-                                Button("Re-record voice") { sampling = member }
-                                Button("Remove member", role: .destructive) { remove(member) }
-                            }
+                                record: { actions.sampling = member },
+                                actions: $actions)
+                            .contextMenu { MemberMenu.items(member, state: $actions) }
                         }
                     }
                 }
@@ -170,10 +159,10 @@ struct RollCallView: View {
             Button {
                 addingMember = true
             } label: {
-                Label("Add member or guest", systemImage: "plus")
+                Label(kind == .board ? "Add member or guest" : "Add person", systemImage: "plus")
             }
             .buttonStyle(.sk1Key(.cream))
-            Text("Tap a name to mark them here or not. Touch and hold for more.")
+            Text("Tap a name to mark them here or not. Use ⋯ to edit someone, re-record or forget their voice, or remove them.")
                 .sk1Hint()
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -222,11 +211,6 @@ struct RollCallView: View {
         if absent.contains(member.id) { absent.remove(member.id) } else { absent.insert(member.id) }
     }
 
-    private func remove(_ member: Member) {
-        context.delete(member)
-        try? context.save()
-    }
-
     private func startMeeting() async {
         guard await AudioRecorder.requestPermission() else {
             micDenied = true
@@ -256,6 +240,7 @@ private struct MemberRow: View {
     let isHere: Bool
     let toggleHere: () -> Void
     let record: () -> Void
+    @Binding var actions: MemberActionState
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -299,6 +284,8 @@ private struct MemberRow: View {
                 .buttonStyle(.sk1Key(.cream))
                 .accessibilityLabel(Text("Record \(member.name)'s voice"))
             }
+
+            MemberMenu(member: member, state: $actions)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -309,18 +296,23 @@ private struct MemberRow: View {
 
 /// Adds a member or guest, or edits one: a name and an optional role, each in an LCD text field. Editing keeps the
 /// voice; when the name changes, an opt-in toggle also renames them in transcripts already made.
+///
+/// The role field follows the meeting: a board meeting asks for a role (Chair, Treasurer…), an ad-hoc meeting for an
+/// optional note (Mom, Coach…), and the People screen (`kind` nil) for either.
 struct MemberSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var role: String
     @State private var updatingTranscripts = false
     private let member: Member?
+    private let kind: MeetingKind?
     /// The name, the role and whether to rename them in past transcripts.
     private let onSave: (String, String, Bool) -> Void
 
     /// `member` nil adds someone new.
-    init(member: Member? = nil, onSave: @escaping (String, String, Bool) -> Void) {
+    init(member: Member? = nil, kind: MeetingKind? = .board, onSave: @escaping (String, String, Bool) -> Void) {
         self.member = member
+        self.kind = kind
         self.onSave = onSave
         _name = State(initialValue: member?.name ?? "")
         _role = State(initialValue: member?.role ?? "")
@@ -339,10 +331,10 @@ struct MemberSheet: View {
                         .onSubmit(save)
                 }
                 VStack(alignment: .leading, spacing: SK1.Metrics.captionToWell) {
-                    SKCaption("Role")
-                    SKTextField("Role", text: $role, prompt: "Chair, Treasurer, Member…")
+                    SKCaption(roleCopy.caption)
+                    SKTextField(roleCopy.caption, text: $role, prompt: roleCopy.prompt)
                         .onSubmit(save)
-                    Text("Optional. It's used in the minutes and in the line each member reads.")
+                    Text(roleCopy.hint)
                         .sk1Hint()
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -368,7 +360,8 @@ struct MemberSheet: View {
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .sk1Chassis()
-            .navigationTitle(member == nil ? "Add member" : "Edit member")
+            .navigationTitle(member == nil ? (kind == .board ? "Add member" : "Add person")
+                                           : (kind == .board ? "Edit member" : "Edit person"))
             .inlineTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -381,6 +374,21 @@ struct MemberSheet: View {
         #if os(macOS)
         .frame(minWidth: 360, minHeight: 300)
         #endif
+    }
+
+    /// What the role field is called, its placeholder and the hint under it.
+    private var roleCopy: (caption: String, prompt: String, hint: String) {
+        switch kind {
+        case .board:
+            return ("Role", "Chair, Treasurer, Member…",
+                    "Optional. It's used in the minutes and in the line each member reads.")
+        case .adHoc:
+            return ("Note", "Mom, Coach, Neighbor…",
+                    "Optional. A few words to tell people apart, shown next to their name.")
+        case nil:
+            return ("Role or note", "Chair, Treasurer, Mom, Coach…",
+                    "Optional. Board minutes use it as their role; anywhere else it's shown next to their name.")
+        }
     }
 
     private func save() {

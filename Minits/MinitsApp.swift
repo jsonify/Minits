@@ -14,6 +14,7 @@ struct MinitsApp: App {
                         case .rollCall: RollCallView()
                         case .recording(let meeting): RecordingView(meeting: meeting)
                         case .meeting(let meeting): MeetingView(meeting: meeting)
+                        case .people: PeopleView()
                         }
                     }
             }
@@ -36,6 +37,7 @@ enum Route: Hashable {
     case rollCall
     case recording(Meeting)
     case meeting(Meeting)
+    case people
 }
 
 @MainActor
