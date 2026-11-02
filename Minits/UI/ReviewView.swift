@@ -103,24 +103,33 @@ struct ReviewView: View {
 
     @ViewBuilder private var intro: some View {
         if showAll {
-            HStack(spacing: 12) {
-                Toggle("Motions only", isOn: $motionsOnly)
-                    .toggleStyle(.sk1Square)
-                    .disabled(meeting.motionMarks.isEmpty)
-                Spacer()
-                ShareLink(item: transcriptText, subject: Text(meeting.title)) {
-                    Label("Share", systemImage: "square.and.arrow.up")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Toggle("Motions only", isOn: $motionsOnly)
+                        .toggleStyle(.sk1Square)
+                        .disabled(meeting.motionMarks.isEmpty)
+                    Spacer()
+                    OutputKey()
+                    ShareLink(item: transcriptText, subject: Text(meeting.title)) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.sk1Key(.cream))
                 }
-                .buttonStyle(.sk1Key(.cream))
+                OutputNote()
             }
         } else {
             VStack(alignment: .leading, spacing: 10) {
                 reviewLCD
-                Text(meeting.linesNeedingReview.isEmpty
-                     ? "Every line has a speaker. Head to \(meeting.kind.documentName) when you're ready."
-                     : "Minits wasn't sure who said these. Tap play to listen, then pick who it was.")
-                    .sk1Hint()
-                    .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top, spacing: 12) {
+                    Text(meeting.linesNeedingReview.isEmpty
+                         ? "Every line has a speaker. Head to \(meeting.kind.documentName) when you're ready."
+                         : "Minits wasn't sure who said these. Tap play to listen, then pick who it was.")
+                        .sk1Hint()
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    OutputKey()
+                }
+                OutputNote()
             }
             .padding(.bottom, 4)
         }
@@ -239,6 +248,7 @@ private struct LineCard: View {
     let confirm: () -> Void
     let nameGuest: () -> Void
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.audioRoute) private var route
 
     var body: some View {
         let p = SK1.palette(for: scheme)
@@ -286,6 +296,14 @@ private struct LineCard: View {
                     .foregroundStyle(Color(sk1Hex: p.ink))
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if isPlaying, let device = route.deviceName {
+                    // The key is lit but the sound may be in a car outside: say where it's going.
+                    HStack(spacing: 6) {
+                        SKLamp(color: .orange, lit: true, glow: 3, size: 7, label: "Playing elsewhere")
+                        SKCaption("Playing on \(device)", tone: .soft)
+                    }
+                }
 
                 if expanded { choices }
             }

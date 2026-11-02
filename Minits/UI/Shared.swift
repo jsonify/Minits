@@ -98,6 +98,8 @@ extension EnvironmentValues {
     /// Whether screens start their work when they appear: recording on the recording screen, processing on the
     /// meeting screen. The screenshot tests turn it off, so they show each screen without the mic or the models.
     @Entry var runsMeetingWork = true
+    /// Where sound plays (`AudioRoute`). The screenshot tests set a fixed one.
+    @Entry var audioRoute: AudioRoute = AudioRoute.shared
 }
 
 extension View {

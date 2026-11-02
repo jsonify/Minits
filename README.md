@@ -30,6 +30,8 @@ Record a board meeting or an ad-hoc meeting on one iPhone (or Mac), find out who
 
 The line being played has a lit orange lamp, and the list scrolls to follow it. A line's play key plays the deck from just before that line; tap it again to pause. The deck stops when you leave the tab. The Review tab still plays one line at a time.
 
+**Where sound plays (iPhone).** iOS plays sound on the last device that connected, so a phone still paired with a car's Bluetooth plays into the car even after you've stepped out, and you hear nothing. Review and the Transcript tab have an **AirPlay** key (next to Review's hint, and between **Motions only** and **Share** on the Transcript tab) that opens iOS's list of outputs, so you can switch back to the iPhone without leaving the app. While sound goes to another device, the key is lit with the orange bar and an orange lamp says where it's going (*Sound is playing on Car Audio.*). A line that's playing says so under its text (*Playing on Car Audio*). On the Mac there's no key: sound goes wherever the menu bar's Sound menu sends it.
+
 **Renaming or deleting a meeting.** On a meeting's screen, the **Edit** menu (top right) has **Rename…** and **Delete meeting…**. On Home, touch and hold (right-click on Mac) a past meeting for the same two. Rename opens an LCD text field. Delete asks first, then removes the recording, transcript and write-up from the device; from the meeting's screen it also goes back to Home. Neither is offered while a meeting is recording or processing.
 
 **People.** Home has a cream **People** key under the meeting keys. It opens a list of everyone saved, with an LCD of how many there are and how many have a voice, and the same **⋯** key on each row as at roll call: edit, record or re-record, forget a voice, or remove someone. You can add people there too, outside a meeting; the field is **Role or note**, used as the role in board minutes and shown next to the name anywhere else.
@@ -83,6 +85,7 @@ Minits/
   Models/Models.swift       SwiftData: Member, Meeting, TranscriptLine
   Audio/                    16 kHz mono WAV recorder, clip playback
   Audio/MeetingPlayer.swift Whole-meeting playback for the cassette deck: transport, volume, speed, meters, current line
+  Audio/AudioRoute.swift    Where sound plays on iPhone (this iPhone, or Bluetooth/AirPlay by name), kept current
   Voice/VoiceEngine.swift   FluidAudio: voiceprints, diarization, matching, transcription
   Minutes/MinutesWriter.swift  Minutes (board) or summary (ad-hoc): Apple Intelligence draft, or outline fallback
   Export/MinutesPDF.swift   The minutes or summary as a printable PDF (Core Text; reads the draft's Markdown, paginates)
@@ -91,6 +94,7 @@ MinitsRecordingWidget/      Widget extension (iOS): draws the recording's Live A
   UI/                       Screens (home, roll call, recording, review, transcript, minutes/summary)
   UI/MeetingTitleSheet.swift Rename a meeting (from Home and the meeting screen)
   UI/CassetteDeck.swift     The transcript's cassette deck: cassette and reels, VU meters, knobs, piano-key transport, counter
+  UI/OutputKey.swift        The AirPlay key (opens iOS's output list) and the note shown while sound plays elsewhere
   UI/IntroView.swift        The first-run intro: how it works, on this device, the consent reminder, the microphone
   UI/Shared.swift           Member avatars, the app's SK-1 ink tint, and the iPhone inline title
   UI/PeopleView.swift       The People screen, and each person's ⋯ menu and sheets (edit, voice, forget, remove)
@@ -119,7 +123,7 @@ CI (GitHub Actions, `macos-latest`) runs `xcodegen`, builds the `Minits` scheme 
 
 ### Screenshots
 
-`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with the cassette deck at rest), the cassette deck mid-meeting while it plays, a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, People (with people and empty), Add person for an ad-hoc meeting, the End the meeting and Forget voice sheets, the working LCD (writing a summary, and partway through the transcript), Home's model download tray (downloading, and failed), and the first-run intro (before the mic is asked, and with the mic off). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
+`MinitsScreenTests` renders every screen from sample data: Home (empty and with meetings), roll call (board and ad-hoc), Add member, the voice sample, recording, processing, a failed meeting, Review, the transcript (with the cassette deck at rest), the cassette deck mid-meeting while it plays, a summary not yet written, finished minutes, the Edit member and Rename meeting sheets, People (with people and empty), Add person for an ad-hoc meeting, the End the meeting and Forget voice sheets, the working LCD (writing a summary, and partway through the transcript), Home's model download tray (downloading, and failed), the first-run intro (before the mic is asked, and with the mic off), and Review and the transcript while sound goes to a car's Bluetooth (AirPlay key lit, the note showing). Each one is rendered in light and dark, at an iPhone width (390 pt) and a wide window's (720 pt, about the Mac's). The screens are shown without starting the mic or the models. It checks that each screen renders, not that it matches a saved image.
 
 - **On a PR:** open the CI run's Summary page and download the `minits-screens` artifact (PNGs at 2x, named like `10-review-iphone-dark.png`).
 - **Locally:** run the command above. With `MINITS_SNAPSHOT_DIR` set (on the command line, as `TEST_RUNNER_MINITS_SNAPSHOT_DIR`, or in the scheme's environment) the PNGs are written there. Either way they're attached to the test results in Xcode's Report navigator.
