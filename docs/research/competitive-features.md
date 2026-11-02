@@ -30,9 +30,11 @@ The main takeaway: **cloud tools treat each meeting as a separate file, and boar
 
 ## Recommendations, ranked
 
+Each idea has a GitHub issue (labelled `enhancement`), linked from its heading.
+
 Each idea gives the source of inspiration, what Minits would do, why it fits Minits in particular, and where it would go in the code.
 
-### 1. Voice roll-call votes: the board's vote, counted by voice ★
+### 1. Voice roll-call votes: the board's vote, counted by voice ★ ([#45](https://github.com/jsonify/Minits/issues/45))
 
 **Inspired by:** BoardBreeze's roll-call votes. The California clerk rule that "at a member's request, the clerk shall enter the ayes and noes."
 
@@ -42,7 +44,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** Diarization is already split by voice (`Voice/VoiceEngine.swift`). Short words like "aye" are hard (see issue #7, crosstalk), so attribute votes from the time window right after the mark. Build it as a structured `Motion` model (below) rather than prose, and score it with `minits-eval`.
 
-### 2. Motions and action items as data, not just prose
+### 2. Motions and action items as data, not just prose ([#44](https://github.com/jsonify/Minits/issues/44))
 
 **Inspired by:** MinuteSmith's extraction, Diligent's carry-over action items, and Taskade's mover/seconder/outcome log.
 
@@ -52,7 +54,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** `Models/Models.swift`, plus a structured-output pass in `Minutes/MinutesWriter.swift` (FoundationModels `@Generable`), keeping the outline fallback for devices without Apple Intelligence.
 
-### 3. The meeting series: open items, prior minutes and the brief
+### 3. The meeting series: open items, prior minutes and the brief ([#46](https://github.com/jsonify/Minits/issues/46))
 
 **Inspired by:** Granola's pre-meeting briefs, the board portals' "roll forward to next meeting", and Diligent sending finished minutes into the next meeting for approval.
 
@@ -65,7 +67,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** A new `MeetingSeries` (or a `seriesID` on `Meeting`), `UI/RollCallView.swift`, and `Export/MinutesPDF.swift` (approval state in the header).
 
-### 4. Agenda-first meetings
+### 4. Agenda-first meetings ([#47](https://github.com/jsonify/Minits/issues/47))
 
 **Inspired by:** iDeals ("your agenda becomes your minutes template") and the municipal clerk tools (agenda plus recording produce formatted minutes).
 
@@ -75,7 +77,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** `UI/RecordingView.swift`, `LiveActivity/` (a Next item key on the lock screen), and the chunking in `MinutesWriter.chunk`, which can split at agenda boundaries.
 
-### 5. Every sentence of the minutes traced back to the tape
+### 5. Every sentence of the minutes traced back to the tape ([#48](https://github.com/jsonify/Minits/issues/48))
 
 **Inspired by:** Granola's chat citations. Clerks still "certify the accuracy of the final minutes."
 
@@ -85,7 +87,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** Ask the model to cite `[TIME]` markers (the notes prompt already includes them), map them to `TranscriptLine`s, and play through `Audio/MeetingPlayer.swift`.
 
-### 6. Off-the-record: executive session and redaction
+### 6. Off-the-record: executive session and redaction ([#49](https://github.com/jsonify/Minits/issues/49))
 
 **Inspired by:** board practice (closed or executive sessions on personnel, legal or contracts) and open-meeting rules. No rival handles this well.
 
@@ -97,7 +99,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** `Audio/AudioRecorder.swift` (pause-and-mark or a separate file), and a redaction pass on the WAV and its lines.
 
-### 7. Ask your meetings, on the device
+### 7. Ask your meetings, on the device ([#50](https://github.com/jsonify/Minits/issues/50))
 
 **Inspired by:** Granola chat (months of notes, with citations), Ask Plaud, and Fireflies' archive search.
 
@@ -107,7 +109,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** Natural Language `NLEmbedding` or keyword index over `TranscriptLine`, and a `LanguageModelSession` for the answer. A new Home tray.
 
-### 8. Quorum lamp
+### 8. Quorum lamp ([#51](https://github.com/jsonify/Minits/issues/51))
 
 **Inspired by:** CaseMark's automatic quorum checks and the board portals' "notify if quorum is not met."
 
@@ -117,7 +119,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** `UI/RollCallView.swift`, `UI/RecordingView.swift`, and attendance in the PDF.
 
-### 9. A note on the mark
+### 9. A note on the mark ([#52](https://github.com/jsonify/Minits/issues/52))
 
 **Inspired by:** Granola (typed notes plus transcript) and Plaud (highlights weighted first in the summary).
 
@@ -127,7 +129,7 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** `Meeting.motionMarks` becomes an array of `Mark { time, note }`, plus `RecordingView` and `MinutesWriter.Prompts`.
 
-### 10. Names spelled right: the group's vocabulary
+### 10. Names spelled right: the group's vocabulary ([#53](https://github.com/jsonify/Minits/issues/53))
 
 **Inspired by:** custom vocabulary in Otter and Fireflies.
 
@@ -135,14 +137,14 @@ Each idea gives the source of inspiration, what Minits would do, why it fits Min
 
 **Where:** A post-pass in `VoiceEngine`, and a list on the People screen.
 
-### 11. Apple-native handoffs that stay on the device
+### 11. Apple-native handoffs that stay on the device ([#54](https://github.com/jsonify/Minits/issues/54))
 
 - **Action items to Reminders** (EventKit), each with its owner in the note and a due date: one key on the minutes screen.
 - **Calendar-aware titles**: if a calendar event is happening now, offer its title and attendees at roll call (EventKit reads locally).
 - **App Intents and a Control Center control**: "Start board meeting" from Siri, Shortcuts, the Action Button, or Control Center.
 - **Apple Watch** as a remote for Mark, Pause and Next item, so the secretary isn't touching the phone in the middle of the table.
 
-### 12. Fair-floor view (optional, for chairs)
+### 12. Fair-floor view (optional, for chairs) ([#55](https://github.com/jsonify/Minits/issues/55))
 
 **Inspired by:** talk-time analytics in Fireflies, tl;dv, Claap and Avoma. Those exist to coach salespeople. Minits can use the same data with a kinder purpose.
 
