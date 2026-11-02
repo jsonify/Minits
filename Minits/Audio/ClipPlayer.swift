@@ -60,6 +60,8 @@ private final class PlayerIO: @unchecked Sendable {
             let session = AVAudioSession.sharedInstance()
             try? session.setCategory(.playback, mode: .spokenAudio)
             try? session.setActive(true)
+            // Playback can go somewhere recording didn't (a car's Bluetooth, say): say where.
+            AudioRoute.refreshShared()
             #endif
             guard let player = try? AVAudioPlayer(contentsOf: url) else {
                 self.player = nil

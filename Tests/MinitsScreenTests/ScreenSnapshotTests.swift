@@ -114,6 +114,14 @@ final class ScreenSnapshotTests: XCTestCase {
                 .padding(20)
                 .sk1Chassis())
             },
+            Screen(name: "27-review-sound-elsewhere") { f in
+                AnyView(MeetingView(meeting: f.review, initialTab: .review)
+                    .environment(\.audioRoute, AudioRoute(deviceName: "Car Audio")))
+            },
+            Screen(name: "28-transcript-sound-elsewhere") { f in
+                AnyView(MeetingView(meeting: f.review, initialTab: .transcript)
+                    .environment(\.audioRoute, AudioRoute(deviceName: "Car Audio")))
+            },
         ]
 
         for screen in screens {
