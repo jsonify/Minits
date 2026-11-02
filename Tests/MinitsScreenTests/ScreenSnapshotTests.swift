@@ -122,6 +122,14 @@ final class ScreenSnapshotTests: XCTestCase {
                 AnyView(MeetingView(meeting: f.review, initialTab: .transcript)
                     .environment(\.audioRoute, AudioRoute(deviceName: "Car Audio")))
             },
+            Screen(name: "29-split-line", inNavigationStack: false) { _ in
+                AnyView(SplitLineSheet(text: "anything there? Oh, yeah, um,", start: 22, end: 25,
+                                       wordStarts: [22.1, 22.6, 23.4, 23.8, 24.3]) { _ in })
+            },
+            Screen(name: "30-split-line-picked", inNavigationStack: false) { _ in
+                AnyView(SplitLineSheet(text: "anything there? Oh, yeah, um,", start: 22, end: 25,
+                                       wordStarts: [22.1, 22.6, 23.4, 23.8, 24.3], cut: 2) { _ in })
+            },
         ]
 
         for screen in screens {

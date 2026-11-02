@@ -20,6 +20,7 @@ struct ReviewView: View {
     @State private var motionsOnly = false
     @State private var namingGuest: TranscriptLine?
     @State private var guestName = ""
+    @State private var splitting: TranscriptLine?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -59,6 +60,11 @@ struct ReviewView: View {
             player.stop()
             deck.stop()
         }
+        .sheet(item: $splitting) { line in
+            SplitLineSheet(text: line.text, start: line.start, end: line.end, wordStarts: line.wordStarts) { index in
+                split(line, atWord: index)
+            }
+        }
         .alert("Who is \(namingGuest?.speakerName ?? "this")?", isPresented: Binding(
             get: { namingGuest != nil }, set: { if !$0 { namingGuest = nil } }
         )) {
@@ -96,7 +102,8 @@ struct ReviewView: View {
             nameGuest: {
                 guestName = ""
                 namingGuest = line
-            })
+            },
+            split: { splitting = line })
     }
 
     // MARK: Header
@@ -228,6 +235,17 @@ struct ReviewView: View {
         refreshStatus()
     }
 
+    /// Two people in one line: cut it where the second starts. Both parts go to Review.
+    private func split(_ line: TranscriptLine, atWord index: Int) {
+        player.stop()
+        if deck.currentLineID == line.id { deck.pause() }
+        meeting.split(line, atWord: index)
+        if showAll {
+            deck.marks = meeting.sortedLines.map { MeetingPlayer.Mark(id: $0.id, start: $0.start, end: $0.end) }
+        }
+        refreshStatus()
+    }
+
     private func refreshStatus() {
         meeting.status = meeting.linesNeedingReview.isEmpty ? .ready : .needsReview
         try? context.save()
@@ -247,8 +265,13 @@ private struct LineCard: View {
     let choose: (Member) -> Void
     let confirm: () -> Void
     let nameGuest: () -> Void
+    /// Opens the split sheet, for a line two people spoke.
+    let split: () -> Void
     @Environment(\.colorScheme) private var scheme
     @Environment(\.audioRoute) private var route
+
+    /// A line needs two words to split.
+    private var canSplit: Bool { LineSplit.words(line.text).count > 1 }
 
     var body: some View {
         let p = SK1.palette(for: scheme)
@@ -331,6 +354,16 @@ private struct LineCard: View {
                         .minimumScaleFactor(0.7)
                 }
                 .buttonStyle(.sk1Key(.cream, size: .large))
+                if canSplit {
+                    Button(action: split) {
+                        Label("Two people…", systemImage: "scissors")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .buttonStyle(.sk1Key(.cream, size: .large))
+                    .accessibilityLabel(Text("Split this line"))
+                    .accessibilityHint(Text("For a line two people spoke: pick where the second one starts"))
+                }
             }
         }
     }
@@ -356,6 +389,10 @@ private struct LineCard: View {
             Button(line.speakerID == nil ? "Name \(line.speakerName)…" : "Someone not listed…") { nameGuest() }
             if line.needsReview {
                 Button("Keep \(line.speakerName)") { confirm() }
+            }
+            if canSplit && !expanded {
+                Divider()
+                Button("Split this line…", systemImage: "scissors") { split() }
             }
         } label: {
             label()

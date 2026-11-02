@@ -209,6 +209,7 @@ struct MeetingView: View {
                 line.confidence = draft.confidence
                 line.needsReview = draft.needsReview
                 line.reviewNote = draft.reviewNote
+                line.wordStarts = draft.wordStarts
                 return line
             }
             meeting.status = meeting.linesNeedingReview.isEmpty ? .ready : .needsReview

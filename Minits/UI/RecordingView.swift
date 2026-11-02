@@ -360,8 +360,9 @@ private struct KeyRow: Layout {
     private func weight(_ index: Int) -> CGFloat { index < weights.count ? weights[index] : 1 }
 }
 
-/// Lays its subviews out left to right, starting a new line when the next one doesn't fit.
-private struct FlowLayout: Layout {
+/// Lays its subviews out left to right, starting a new line when the next one doesn't fit. Also lays out the split
+/// sheet's words.
+struct FlowLayout: Layout {
     var spacing: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
